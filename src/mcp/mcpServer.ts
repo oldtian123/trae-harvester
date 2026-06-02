@@ -77,7 +77,7 @@ function createConfiguredMcpServer(): McpServer {
 
     mcpServer.resource(
         'ai-context',
-        new ResourceTemplate('harvester://state/ai-context', { list: undefined }),
+        'harvester://state/ai-context',
         async (uri, variables) => {
             const { getAiContext } = require('../commands/testRunner');
             const aiContext = getAiContext();
@@ -92,7 +92,7 @@ function createConfiguredMcpServer(): McpServer {
 
     mcpServer.resource(
         'logs',
-        new ResourceTemplate('harvester://state/logs', { list: undefined }),
+        'harvester://state/logs',
         async (uri, variables) => {
             try {
                 const logPath = getLogger().getLogFilePath();
@@ -114,7 +114,7 @@ function createConfiguredMcpServer(): McpServer {
 
     mcpServer.resource(
         'plan',
-        new ResourceTemplate('harvester://state/plan', { list: undefined }),
+        'harvester://state/plan',
         async (uri, variables) => {
             const plan = getCurrentPlan();
             return {
@@ -128,7 +128,7 @@ function createConfiguredMcpServer(): McpServer {
 
     mcpServer.resource(
         'test-results',
-        new ResourceTemplate('harvester://state/test-results', { list: undefined }),
+        'harvester://state/test-results',
         async (uri, variables) => {
             const plan = getCurrentPlan();
             const resultsMap = getStepResults();
@@ -151,7 +151,7 @@ function createConfiguredMcpServer(): McpServer {
 
     mcpServer.resource(
         'check-items',
-        new ResourceTemplate('harvester://state/check-items', { list: undefined }),
+        'harvester://state/check-items',
         async (uri, variables) => {
             const plan = getCurrentPlan();
             const items = plan?.check_items || [];
@@ -169,8 +169,8 @@ function createConfiguredMcpServer(): McpServer {
     // ==========================================
 
     mcpServer.tool(
-        'import_test_plan',
-        'Import a complete JSON string representing the test plan (steps and check_items) and wait for the human to execute it.',
+        'trea_harvester_import_test_plan',
+        'Use this trea_harvester tool to import a complete JSON string representing the test plan (steps and check_items) and wait for the human to execute it.',
         {
             jsonText: z.string().describe('The JSON string matching the TestPlan format (e.g. {"steps": [...], "check_items": [...]})')
         },
@@ -191,8 +191,8 @@ function createConfiguredMcpServer(): McpServer {
     );
 
     mcpServer.tool(
-        'get_evaluation_evidence',
-        'Automatically generate a git patch, gather test results, ai context, and manual check items, returning a complete JSON object for evaluation scoring.',
+        'trea_harvester_get_evaluation_evidence',
+        'Use this trea_harvester tool to gather test results, ai context, and manual check items, returning a complete JSON object for evaluation scoring.',
         {},
         async () => {
             try {
@@ -234,7 +234,41 @@ function createConfiguredMcpServer(): McpServer {
     );
 
     mcpServer.tool(
-        'test_connection',
+        'trea_harvester_export_patch',
+        'Use this trea_harvester tool to export a git patch of the current branch compared to main. Returns the path to the patch file.',
+        {},
+        async () => {
+            try {
+                const config = vscode.workspace.getConfiguration('traeHarvester');
+                const outputDir = config.get<string>('patchOutputPath', '/gitdiff_shared');
+                const { exportGitPatch } = require('../commands/gitPatch');
+                const patchFilePath = await exportGitPatch(outputDir);
+                return {
+                    content: [{ type: 'text', text: `Patch exported successfully to: ${patchFilePath}` }]
+                };
+            } catch (err: any) {
+                return {
+                    content: [{ type: 'text', text: `Failed to export patch: ${err.message}` }],
+                    isError: true
+                };
+            }
+        }
+    );
+
+    mcpServer.tool(
+        'trea_harvester_run_all_tests',
+        'Use this trea_harvester tool to execute all tests defined in the test plan in the terminal.',
+        {},
+        async () => {
+            vscode.commands.executeCommand('trae-harvester.runAllTests');
+            return {
+                content: [{ type: 'text', text: 'Started running all tests.' }]
+            };
+        }
+    );
+
+    mcpServer.tool(
+        'trea_harvester_test_connection',
         'Test the connection to the MCP Server. Called by the model to verify it successfully connected to the extension.',
         {},
         async () => {

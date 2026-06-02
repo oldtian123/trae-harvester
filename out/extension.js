@@ -46,6 +46,7 @@ const diagnostics_1 = require("./commands/diagnostics");
 const testPanelProvider_1 = require("./providers/testPanelProvider");
 const logger_1 = require("./utils/logger");
 const mcpServer_1 = require("./mcp/mcpServer");
+const autoUpdater_1 = require("./utils/autoUpdater");
 /**
  * 扩展激活时调用。
  * VS Code 会在用户首次触发本扩展注册的命令或视图时调用此函数。
@@ -125,6 +126,8 @@ function activate(context) {
     log.info('Extension', '🚀 Trae Harvester 初始化完成!');
     log.info('Extension', '可用命令: exportPatch / inputTestSteps / runAllTests / runSingleStep / harvestAll / runDiagnostics');
     log.info('Extension', '💡 提示: 执行 "Trae Harvester: Run Diagnostics" 可一键检查运行环境');
+    // ---- 检查更新 ----
+    (0, autoUpdater_1.checkForUpdates)(context);
     log.setSuccess('已就绪');
 }
 /**

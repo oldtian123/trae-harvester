@@ -145,7 +145,8 @@ async function executeStep(step: TestStep, cwd: string, timeoutMs: number): Prom
     });
 
     try {
-        const effectiveCwd = step.cwd || cwd;
+        const path = require('path');
+        const effectiveCwd = step.cwd ? path.resolve(cwd, step.cwd) : cwd;
         const effectiveTimeout = step.timeout || timeoutMs;
 
         const result = await runShellCommand(step.command, effectiveCwd, effectiveTimeout);

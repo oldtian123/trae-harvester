@@ -10,6 +10,7 @@ import { registerDiagnosticsCommands } from './commands/diagnostics';
 import { TestPanelProvider } from './providers/testPanelProvider';
 import { getLogger } from './utils/logger';
 import { startMcpServer, stopMcpServer } from './mcp/mcpServer';
+import { checkForUpdates } from './utils/autoUpdater';
 
 /**
  * 扩展激活时调用。
@@ -112,6 +113,10 @@ export function activate(context: vscode.ExtensionContext) {
     log.info('Extension', '🚀 Trae Harvester 初始化完成!');
     log.info('Extension', '可用命令: exportPatch / inputTestSteps / runAllTests / runSingleStep / harvestAll / runDiagnostics');
     log.info('Extension', '💡 提示: 执行 "Trae Harvester: Run Diagnostics" 可一键检查运行环境');
+
+    // ---- 检查更新 ----
+    checkForUpdates(context);
+
     log.setSuccess('已就绪');
 }
 

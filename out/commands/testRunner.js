@@ -179,7 +179,8 @@ async function executeStep(step, cwd, timeoutMs) {
         stepNumber: step.step_number,
     });
     try {
-        const effectiveCwd = step.cwd || cwd;
+        const path = require('path');
+        const effectiveCwd = step.cwd ? path.resolve(cwd, step.cwd) : cwd;
         const effectiveTimeout = step.timeout || timeoutMs;
         const result = await (0, shell_1.runShellCommand)(step.command, effectiveCwd, effectiveTimeout);
         const durationMs = Date.now() - startTime;
