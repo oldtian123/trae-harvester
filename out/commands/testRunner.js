@@ -46,6 +46,7 @@ exports.getCurrentPlan = getCurrentPlan;
 exports.getStepResults = getStepResults;
 exports.runStepByNumber = runStepByNumber;
 exports.deleteStepFromPlan = deleteStepFromPlan;
+exports.resetStepResults = resetStepResults;
 exports.addStepToPlan = addStepToPlan;
 exports.addCheckItemToPlan = addCheckItemToPlan;
 exports.toggleCheckItemInPlan = toggleCheckItemInPlan;
@@ -431,6 +432,31 @@ async function deleteStepFromPlan(stepNumber) {
         // Ignore write error if it fails (e.g. dir doesn't exist)
         (0, fileUtils_1.writeJson)(resultPath, testResult).catch(() => { });
     }
+    syncPlanToWebview();
+}
+/**
+ * 重置所有测试结果（清空命令行输出，但保留测试计划和上下文）
+ */
+async function resetStepResults() {
+    if (!currentPlan)
+        return;
+    // 清空结果
+    stepResults.clear();
+    // 生成 PENDING 状态的新 test_result.json
+    const config = vscode.workspace.getConfiguration('traeHarvester');
+    const outputPath = config.get('resultsOutputPath', '/gitdiff_shared');
+    const allResults = currentPlan.steps.map(s => ({
+        step_number: s.step_number,
+        title: s.title,
+        command: s.command,
+        status: 'PENDING',
+        exit_code: null,
+        duration_ms: 0,
+        console_output: '',
+    }));
+    const testResult = buildTestResult(allResults, currentPlan.steps.length);
+    const resultPath = path.join(outputPath, 'test_result.json');
+    (0, fileUtils_1.writeJson)(resultPath, testResult).catch(() => { });
     syncPlanToWebview();
 }
 /**

@@ -118,6 +118,11 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
                             vscode.window.showInformationMessage('✅ AI 思考上下文已保存');
                         }
                         break;
+                    case 'resetResults':
+                        const { resetStepResults } = require('../commands/testRunner');
+                        await resetStepResults();
+                        vscode.window.showInformationMessage('🔄 测试执行结果已重置');
+                        break;
                     case 'clearAll':
                         const { clearAllState } = require('../commands/testRunner');
                         clearAllState();
@@ -203,6 +208,9 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
                 <button id="btn-open-settings" class="btn btn-secondary" title="配置插件参数">
                     ⚙️ 插件设置
                 </button>
+                <button id="btn-clear-all" class="btn btn-secondary" title="一键清除当前测试计划、结果和上下文" style="color: var(--vscode-errorForeground);">
+                    🗑️ 全部清除
+                </button>
             </div>
             <div class="actions">
                 <button id="btn-export-patch" class="btn btn-secondary" title="一键导出 Git Patch">
@@ -226,8 +234,8 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
                 <button id="btn-copy-json" class="btn btn-secondary" title="将当前用例复制为 JSON 文本">
                     📑 复制 JSON
                 </button>
-                <button id="btn-clear-all" class="btn btn-secondary" title="一键清除当前测试计划、结果和上下文" style="color: var(--vscode-errorForeground);">
-                    🗑️ 一键清除
+                <button id="btn-reset-results" class="btn btn-secondary" title="重置当前所有测试的执行状态和终端输出">
+                    🔄 重置状态
                 </button>
                 <button id="btn-run-all" class="btn btn-primary" title="一键执行所有步骤" disabled>
                     ▶ 全部执行

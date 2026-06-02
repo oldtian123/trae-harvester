@@ -29,6 +29,7 @@
     const inputAiContext = document.getElementById('input-ai-context');
     const btnSaveAiContext = document.getElementById('btn-save-ai-context');
     const btnClearAll = document.getElementById('btn-clear-all');
+    const btnResetResults = document.getElementById('btn-reset-results');
 
     // ---- 新增：主菜单按钮及面板 ----
     const btnShowAddMenu = document.getElementById('btn-show-add-menu');
@@ -113,6 +114,12 @@
     if (btnClearAll) {
         btnClearAll.addEventListener('click', () => {
             vscode.postMessage({ command: 'clearAll' });
+        });
+    }
+
+    if (btnResetResults) {
+        btnResetResults.addEventListener('click', () => {
+            vscode.postMessage({ command: 'resetResults' });
         });
     }
 
