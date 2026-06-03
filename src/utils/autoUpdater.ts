@@ -20,9 +20,12 @@ export async function checkForUpdates(context: vscode.ExtensionContext, isManual
         const currentVersion = context.extension.packageJSON.version;
         log.info('AutoUpdater', `当前版本: ${currentVersion} (手动检查: ${isManual})`);
 
+        const configToken = vscode.workspace.getConfiguration('traeHarvester').get<string>('githubToken');
+        const githubToken = configToken || process.env.GITHUB_TOKEN;
+
         // Fetch remote package.json (带随机数绕过缓存)
         const ts = Date.now();
-        const remotePackageJsonStr = await fetchUrl(`${PACKAGE_JSON_URL}?t=${ts}`);
+        const remotePackageJsonStr = await fetchUrl(`${PACKAGE_JSON_URL}?t=${ts}`, githubToken);
         const remotePackageJson = JSON.parse(remotePackageJsonStr);
         const remoteVersion = remotePackageJson.version;
 
@@ -42,7 +45,7 @@ export async function checkForUpdates(context: vscode.ExtensionContext, isManual
             );
 
             if (action === '立即更新') {
-                await downloadAndInstallUpdate(remoteVersion);
+                await downloadAndInstallUpdate(remoteVersion, githubToken);
             }
         } else {
             log.info('AutoUpdater', '当前已经是最新版本');
@@ -55,12 +58,16 @@ export async function checkForUpdates(context: vscode.ExtensionContext, isManual
     }
 }
 
-function fetchUrl(url: string): Promise<string> {
+function fetchUrl(url: string, token?: string): Promise<string> {
     return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
+        const options: https.RequestOptions = {};
+        if (token) {
+            options.headers = { 'Authorization': `token ${token}` };
+        }
+        https.get(url, options, (res) => {
             // 处理重定向 (GitHub Raw 可能会有 301/302)
             if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                return fetchUrl(res.headers.location).then(resolve).catch(reject);
+                return fetchUrl(res.headers.location, token).then(resolve).catch(reject);
             }
 
             if (res.statusCode !== 200) {
@@ -94,7 +101,7 @@ function isNewerVersion(local: string, remote: string): boolean {
 /**
  * 下载并调用 VS Code API 安装
  */
-async function downloadAndInstallUpdate(version: string) {
+async function downloadAndInstallUpdate(version: string, token?: string) {
     const log = getLogger();
     await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
@@ -108,7 +115,7 @@ async function downloadAndInstallUpdate(version: string) {
             log.info('AutoUpdater', `下载地址: ${downloadUrl}`);
             log.info('AutoUpdater', `保存到: ${tmpPath}`);
 
-            await downloadFile(downloadUrl, tmpPath, progress);
+            await downloadFile(downloadUrl, tmpPath, progress, token);
             
             progress.report({ message: '下载完成，正在安装扩展...' });
             
@@ -141,12 +148,16 @@ async function downloadAndInstallUpdate(version: string) {
     });
 }
 
-function downloadFile(url: string, dest: string, progress: vscode.Progress<{ message?: string; increment?: number }>): Promise<void> {
+function downloadFile(url: string, dest: string, progress: vscode.Progress<{ message?: string; increment?: number }>, token?: string): Promise<void> {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
         
         const doDownload = (targetUrl: string) => {
-            https.get(targetUrl, (res) => {
+            const options: https.RequestOptions = {};
+            if (token) {
+                options.headers = { 'Authorization': `token ${token}` };
+            }
+            https.get(targetUrl, options, (res) => {
                 // 处理重定向
                 if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
                     return doDownload(res.headers.location);
