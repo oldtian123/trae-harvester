@@ -189,11 +189,9 @@ function createConfiguredMcpServer() {
             const { exportGitPatch } = require('../commands/gitPatch');
             let patchContent = '';
             try {
-                const patchFilePath = await exportGitPatch(outputDir);
-                const fs = require('fs');
-                if (fs.existsSync(patchFilePath)) {
-                    patchContent = fs.readFileSync(patchFilePath, 'utf-8');
-                }
+                await exportGitPatch(outputDir);
+                const { getStoredGitPatchContent } = require('../commands/gitPatch');
+                patchContent = getStoredGitPatchContent();
             }
             catch (e) {
                 patchContent = `Failed to get patch: ${e.message}`;
@@ -233,6 +231,18 @@ function createConfiguredMcpServer() {
                 isError: true
             };
         }
+    });
+    mcpServer.tool('trea_harvester_get_git_patch', 'Use this trea_harvester tool to directly retrieve the git diff patch content that was stored in the plugin during the last export.', {}, async () => {
+        const { getStoredGitPatchContent } = require('../commands/gitPatch');
+        const patchContent = getStoredGitPatchContent();
+        if (!patchContent) {
+            return {
+                content: [{ type: 'text', text: 'No git patch has been exported yet. Please run trea_harvester_export_patch first.' }]
+            };
+        }
+        return {
+            content: [{ type: 'text', text: patchContent }]
+        };
     });
     mcpServer.tool('trea_harvester_run_all_tests', 'Use this trea_harvester tool to execute all tests defined in the test plan in the terminal.', {}, async () => {
         vscode.commands.executeCommand('trae-harvester.runAllTests');

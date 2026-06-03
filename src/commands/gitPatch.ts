@@ -10,6 +10,12 @@ import { execCommand } from '../utils/shell';
 import { atomicWrite, ensureDir } from '../utils/fileUtils';
 import { getLogger } from '../utils/logger';
 
+let currentGitPatchContent: string = '';
+
+export function getStoredGitPatchContent(): string {
+    return currentGitPatchContent;
+}
+
 /** Git 操作的每步日志 */
 interface GitStepLog {
     step: string;
@@ -221,6 +227,7 @@ export async function exportGitPatch(outputDir: string): Promise<string> {
         patchContent = diffResult.stdout;
     }
 
+    currentGitPatchContent = patchContent;
     await atomicWrite(patchFilePath, patchContent);
 
     vscode.window.showInformationMessage(

@@ -38,6 +38,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getStoredGitPatchContent = getStoredGitPatchContent;
 exports.exportGitPatch = exportGitPatch;
 exports.registerExportPatchCommand = registerExportPatchCommand;
 const vscode = __importStar(require("vscode"));
@@ -45,6 +46,10 @@ const path = __importStar(require("path"));
 const shell_1 = require("../utils/shell");
 const fileUtils_1 = require("../utils/fileUtils");
 const logger_1 = require("../utils/logger");
+let currentGitPatchContent = '';
+function getStoredGitPatchContent() {
+    return currentGitPatchContent;
+}
 /**
  * 执行 Git Patch 导出的完整流程。
  *
@@ -225,6 +230,7 @@ async function exportGitPatch(outputDir) {
     else {
         patchContent = diffResult.stdout;
     }
+    currentGitPatchContent = patchContent;
     await (0, fileUtils_1.atomicWrite)(patchFilePath, patchContent);
     vscode.window.showInformationMessage(`✅ Patch 已导出: ${patchFilePath}`);
     // 输出操作日志到 Output Channel 方便调试
