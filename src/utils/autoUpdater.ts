@@ -11,26 +11,32 @@ const VSIX_URL = `${REPO_RAW_BASE}/trae-harvester.vsix`;
 
 /**
  * 检查并执行自动更新
+ * @param context 扩展上下文
+ * @param isManual 是否手动触发（影响提示框）
  */
-export async function checkForUpdates(context: vscode.ExtensionContext) {
+export async function checkForUpdates(context: vscode.ExtensionContext, isManual: boolean = false) {
     const log = getLogger();
     try {
         const currentVersion = context.extension.packageJSON.version;
-        log.info('AutoUpdater', `当前版本: ${currentVersion}`);
+        log.info('AutoUpdater', `当前版本: ${currentVersion} (手动检查: ${isManual})`);
 
-        // Fetch remote package.json
-        const remotePackageJsonStr = await fetchUrl(PACKAGE_JSON_URL);
+        // Fetch remote package.json (带随机数绕过缓存)
+        const ts = Date.now();
+        const remotePackageJsonStr = await fetchUrl(`${PACKAGE_JSON_URL}?t=${ts}`);
         const remotePackageJson = JSON.parse(remotePackageJsonStr);
         const remoteVersion = remotePackageJson.version;
 
-        if (!remoteVersion) return;
+        if (!remoteVersion) {
+            if (isManual) vscode.window.showErrorMessage('检查更新失败：无法解析远程版本号');
+            return;
+        }
 
         log.info('AutoUpdater', `线上版本: ${remoteVersion}`);
 
         // 对比版本号
         if (isNewerVersion(currentVersion, remoteVersion)) {
             const action = await vscode.window.showInformationMessage(
-                `Trae Harvester 发现新版本 (v${remoteVersion})，当前版本 v${currentVersion}。是否立即静默更新？`,
+                `Trae Harvester 发现新版本 (v${remoteVersion})，当前版本 v${currentVersion}。是否立即更新？`,
                 '立即更新',
                 '稍后'
             );
@@ -40,6 +46,9 @@ export async function checkForUpdates(context: vscode.ExtensionContext) {
             }
         } else {
             log.info('AutoUpdater', '当前已经是最新版本');
+            if (isManual) {
+                vscode.window.showInformationMessage(`✅ 当前已经是最新版本 (v${currentVersion})`);
+            }
         }
     } catch (e: any) {
         log.error('AutoUpdater', '检查更新失败', e);
@@ -93,11 +102,13 @@ async function downloadAndInstallUpdate(version: string) {
         cancellable: false
     }, async (progress) => {
         try {
-            const tmpPath = path.join(os.tmpdir(), `trae-harvester-v${version}.vsix`);
-            log.info('AutoUpdater', `下载地址: ${VSIX_URL}`);
+            const ts = Date.now();
+            const tmpPath = path.join(os.tmpdir(), `trae-harvester-v${version}-${ts}.vsix`);
+            const downloadUrl = `${VSIX_URL}?t=${ts}`; // 绕过缓存
+            log.info('AutoUpdater', `下载地址: ${downloadUrl}`);
             log.info('AutoUpdater', `保存到: ${tmpPath}`);
 
-            await downloadFile(VSIX_URL, tmpPath, progress);
+            await downloadFile(downloadUrl, tmpPath, progress);
             
             progress.report({ message: '下载完成，正在安装扩展...' });
             
@@ -105,6 +116,16 @@ async function downloadAndInstallUpdate(version: string) {
             await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(tmpPath));
             
             log.setSuccess(`扩展更新到 v${version} 成功`);
+            
+            // 安装完成后清理临时文件
+            try {
+                if (fs.existsSync(tmpPath)) {
+                    fs.unlinkSync(tmpPath);
+                    log.info('AutoUpdater', `已清理临时文件: ${tmpPath}`);
+                }
+            } catch (cleanupErr: any) {
+                log.warn('AutoUpdater', `清理临时文件失败: ${cleanupErr.message}`);
+            }
             
             const action = await vscode.window.showInformationMessage(
                 `🎉 Trae Harvester v${version} 更新成功！需要重载窗口以生效。`,

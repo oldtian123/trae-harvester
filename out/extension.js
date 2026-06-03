@@ -122,6 +122,10 @@ function activate(context) {
     diagCmds.forEach((cmd) => context.subscriptions.push(cmd));
     log.debug('Extension', '已注册命令: trae-harvester.runDiagnostics');
     log.debug('Extension', '已注册命令: trae-harvester.showLogs');
+    const checkUpdatesCmd = vscode.commands.registerCommand('trae-harvester.checkForUpdates', () => {
+        (0, autoUpdater_1.checkForUpdates)(context, true);
+    });
+    context.subscriptions.push(checkUpdatesCmd);
     // ---- 显示欢迎信息 ----
     log.info('Extension', '🚀 Trae Harvester 初始化完成!');
     log.info('Extension', '可用命令: exportPatch / inputTestSteps / runAllTests / runSingleStep / harvestAll / runDiagnostics');

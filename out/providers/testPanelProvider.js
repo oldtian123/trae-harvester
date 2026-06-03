@@ -151,6 +151,9 @@ class TestPanelProvider {
                     clearAllState();
                     vscode.window.showInformationMessage('🗑️ 已清除所有上下文和测试结果');
                     break;
+                case 'checkUpdates':
+                    await vscode.commands.executeCommand('trae-harvester.checkForUpdates');
+                    break;
             }
         }, undefined, []);
         // 当 Webview 被销毁时清除引用
@@ -217,6 +220,9 @@ class TestPanelProvider {
                 </button>
                 <button id="btn-open-settings" class="btn btn-secondary" title="配置插件参数">
                     ⚙️ 插件设置
+                </button>
+                <button id="btn-check-updates" class="btn btn-secondary" title="检查并安装最新版本">
+                    🔄 检查更新
                 </button>
                 <button id="btn-clear-all" class="btn btn-secondary" title="一键清除当前测试计划、结果和上下文" style="color: var(--vscode-errorForeground);">
                     🗑️ 全部清除

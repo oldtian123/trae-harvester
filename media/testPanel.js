@@ -30,6 +30,7 @@
     const btnSaveAiContext = document.getElementById('btn-save-ai-context');
     const btnClearAll = document.getElementById('btn-clear-all');
     const btnResetResults = document.getElementById('btn-reset-results');
+    const btnCheckUpdates = document.getElementById('btn-check-updates');
 
     // ---- 新增：主菜单按钮及面板 ----
     const btnShowAddMenu = document.getElementById('btn-show-add-menu');
@@ -105,6 +106,12 @@
     btnOpenSettings.addEventListener('click', () => {
         vscode.postMessage({ command: 'openSettings' });
     });
+
+    if (btnCheckUpdates) {
+        btnCheckUpdates.addEventListener('click', () => {
+            vscode.postMessage({ command: 'checkUpdates' });
+        });
+    }
 
     btnSaveAiContext.addEventListener('click', () => {
         const text = inputAiContext.value.trim();
