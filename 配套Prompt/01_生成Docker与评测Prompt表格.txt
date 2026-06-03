@@ -1,0 +1,233 @@
+﻿# Prompt A：仓库容器化与评测 Prompt 生成
+
+角色：你是一个顶尖的 AI 代码数据集标注专家，精通 Docker 容器化规范与工程实践、大模型代码能力评测标准、代码生成质量评估、仓库架构分析与工程化验证。
+
+任务：我已经将某个开源仓库的代码提供给你，就在 `repo` 文件夹里。请你先彻底理解该仓库的架构、技术栈、依赖、启动方式、测试方式、工程约束、核心业务流程和可验收行为，然后完成以下工作：
+
+1. 生成符合 Docker 容器化规范的 Dockerfile 和 docker-compose.yml。
+2. 设计不少于 8 条高质量用户 Prompt，用于评测模型在该仓库上的代码能力，并将这些 Prompt 统一维护在单独的 Excel 表格文件中。
+3. 每条 Prompt 都要给出完成难度。
+
+重要执行背景：
+- 每条 Prompt 会分别分发给多个模型执行，每个模型都在独立分支中修改代码。
+- 同一条 Prompt 下，不同模型分支之间互不影响；后续评分时必须独立评价每个模型的产物，不得参考其他模型的生成结果。
+- 不同 Prompt 之间也互不继承代码修改；后续评价某条 Prompt 的结果时，不得默认该模型已经继承上一条 Prompt 的代码改动或上下文产物。
+- 后续评分会使用单独的评分 Prompt，不要把评分流程混入本 Prompt 的最终输出。
+
+后续关于该仓库的更多细化问题，我会持续在当前对话中提问，请保持对该仓库上下文的记忆。
+
+---
+
+## 第一部分：生成符合 Docker 容器化规范的 Dockerfile 和 docker-compose.yml
+
+请根据当前仓库的真实技术栈生成可用 Dockerfile 和 docker-compose.yml。
+
+要求：
+
+0. 文件位置与构建上下文：
+   - Dockerfile 和 docker-compose.yml 均应按放置在 `repo` 文件夹的父目录中来设计。
+   - docker-compose.yml 的构建上下文应能支持 Dockerfile 中的 `COPY repo/ .`。
+   - `./result` 挂载路径也应相对于 `repo` 文件夹的父目录解析。
+
+1. 基础镜像：
+   - 根据项目语言选择合适的轻量基础镜像，例如 `node:20-slim`、`python:3.10-slim`、`golang:1.22-bookworm` 等。
+   - 不要误判语言栈，必须基于仓库文件确认。
+
+2. 系统依赖：
+   - 必须通过包管理器安装基础工具：
+     - git
+     - gcc
+     - binutils
+     - procps
+     - patch
+   - 根据仓库实际需要补充运行依赖，例如：
+     - Python 图像/科学计算项目可能需要 libgl1、libglib2.0-0、libgomp1 等。
+     - Node 项目需要 npm install / pnpm install / yarn install。
+     - Go 项目需要 go mod download / go build。
+   - 安装后清理包管理器缓存。
+
+3. 工作目录与项目代码：
+   - 必须设置：
+     WORKDIR /app
+   - 必须复制仓库代码：
+     COPY repo/ .
+   - 必须在镜像构建阶段完成项目依赖安装，而不是等容器启动后再装。
+   - 依赖安装命令必须基于仓库实际文件判断，例如：
+     - pip install -r requirements.txt
+     - pip install -r requirements_versions.txt
+     - npm install
+     - go mod download
+     - poetry install
+     - pnpm install
+   - 必须创建容器内结果目录：
+     RUN mkdir -p /app/result
+
+4. 容器启动行为：
+   - 生成的 Dockerfile 或 docker-compose.yml 不得在容器启动时自动启动被测项目服务，避免项目占用端口后无法明确停止。
+   - Dockerfile 可以完成依赖安装、构建、初始化必要目录和配置命令入口，但不得把 `npm start`、`npm run dev`、`python app.py`、`uvicorn ...`、`go run ...` 等项目服务启动命令写入 CMD、ENTRYPOINT 或 docker-compose command 中。
+   - 项目服务启动命令只能写入 Prompt Excel 的“验收方式”列，由评测者或自动评测环境按需执行。
+   - 官方 SSH 插件入口除外，Dockerfile 末尾仍必须保留指定的 SSH 插件 ENTRYPOINT。
+
+5. 敏感配置与 GitHub 凭据：
+   - Dockerfile 中不得出现 GitHub 账号、GitHub 邮箱、GitHub token、Personal Access Token、`GH_TOKEN`、`GITHUB_TOKEN` 等敏感配置或占位值。
+   - Dockerfile 中不得执行 `git config --global user.name ...`、`git config --global user.email ...`、写入 GitHub 凭据、写入 `.netrc`、写入 credential helper 或把 token 拼进 git remote URL。
+   - 所有运行期配置都应放在 docker-compose.yml 中，通过 `environment` 或 `env_file` 注入容器。
+   - docker-compose.yml 必须预留 GitHub 操作所需的环境变量，便于容器内执行 git / GitHub 操作，例如：
+     - `GITHUB_USERNAME`
+     - `GITHUB_EMAIL`
+     - `GITHUB_TOKEN`
+     - `GH_TOKEN`
+     - `GIT_AUTHOR_NAME`
+     - `GIT_AUTHOR_EMAIL`
+     - `GIT_COMMITTER_NAME`
+     - `GIT_COMMITTER_EMAIL`
+   - docker-compose.yml 中不得硬编码真实 token 或真实私密账号信息，应使用宿主机环境变量引用形式，例如 `${GITHUB_TOKEN}`、`${GITHUB_USERNAME}`、`${GITHUB_EMAIL}`。
+   - 如果需要在容器启动时完成 git 身份配置，应通过 docker-compose.yml 注入的环境变量完成，不得把具体身份配置固化进 Dockerfile 镜像层。
+   - 若生成示例 `.env` 说明，只能写占位符，不得写真实 token。
+   - Dockerfile 中不得复制、生成或写入宿主机 SSH 私钥、公钥、`authorized_keys`、known_hosts 等登录凭据。
+   - 如需免密登录容器，必须通过 docker-compose.yml 将宿主机生成的 SSH 公钥或授权文件以只读 volume 方式挂载到容器中，优先挂载公钥/authorized_keys，而不是私钥。
+   - 如因 GitHub SSH 操作确实需要私钥，也必须通过 docker-compose.yml 以只读 volume 挂载，并放在明确路径，例如 `/root/.ssh/id_rsa:ro`；不得把私钥写入 Dockerfile、镜像层、仓库文件或最终回答正文。
+
+6. 必备 patch 补丁：
+   Dockerfile 中必须包含：
+   RUN command -v patch >/dev/null 2>&1 || ( (apt-get update && apt-get install -y --no-install-recommends patch && rm -rf /var/lib/apt/lists/*) 2>/dev/null || apk add --no-cache patch 2>/dev/null || yum install -y patch 2>/dev/null || true )
+
+7. Windows 换行符清理：
+   由于宿主机可能是 Windows 环境，为防止 SSH 脚本失效，必须在复制插件后、容器入口执行前运行：
+   RUN find /opt/ssh_plugin -type f -name "*.sh" -exec sed -i 's/\r$//' {} \;
+
+8. 官方 SSH 插件块：
+   Dockerfile 末尾必须强行注入以下内容，不得省略：
+   USER root
+   COPY ssh_plugin/ /opt/ssh_plugin/
+   RUN find /opt/ssh_plugin -type f -name "*.sh" -exec sed -i 's/\r$//' {} \; && chmod +x /opt/ssh_plugin/*.sh && /opt/ssh_plugin/install_ssh.sh
+   EXPOSE 22
+   ENTRYPOINT ["/opt/ssh_plugin/entrypoint.sh"]
+
+9. docker-compose.yml 要求：
+   - 必须基于当前 Dockerfile 构建镜像。
+   - 必须将宿主机的 `./result` 挂载到容器内的 `/app/result`，用于持久化导出的模型回复、终端命令行记录和测试结果。
+   - 必须在服务的 `environment` 或 `env_file` 中配置 GitHub 相关运行期环境变量，使容器启动后即可获得 GitHub 操作所需的账号、邮箱和 token 配置。
+   - GitHub token 等敏感值必须通过宿主机环境变量或 `.env` 文件传入，不得在 docker-compose.yml 中写死真实值。
+   - 必须支持将宿主机生成的 root SSH 登录公钥挂载到容器内，实现 root 用户免密登录。推荐形式为将宿主机文件（例如 `./ssh/root_authorized_keys` 或 `${HOST_ROOT_AUTHORIZED_KEYS}`）只读挂载到 `/root/.ssh/authorized_keys`。
+   - 如果使用 SSH 私钥进行 GitHub SSH 操作，可在 docker-compose.yml 中预留只读挂载示例，例如 `${HOST_SSH_PRIVATE_KEY}:/root/.ssh/id_rsa:ro` 和 `${HOST_SSH_KNOWN_HOSTS}:/root/.ssh/known_hosts:ro`，但不得写入真实路径以外的敏感内容或真实密钥正文。
+   - 如需容器启动时修正 SSH 文件权限，应通过 docker-compose.yml 的启动前初始化命令或官方 SSH 插件机制完成，并确保不会自动启动被测项目服务。
+   - 如果项目需要数据库、缓存或其他依赖服务，可以在 docker-compose.yml 中补充对应服务，但不得自动启动被测项目服务。
+   - docker-compose.yml 中不得配置会自动运行项目服务的 command 或 entrypoint。
+   - 如需暴露 SSH 端口，可以只暴露 SSH 所需端口；项目业务端口是否映射应根据仓库需要谨慎设置，并避免默认自动占用业务端口。
+
+10. 网络环境：
+   - 我的网络环境可以直接访问外网，不需要配置任何代理。
+
+---
+
+## 第二部分：生成 Prompt Excel 表格文件
+
+请基于当前仓库真实情况，设计不少于 8 条高质量 Prompt，建议生成 8-12 条，其中一部分作为备用 Prompt。
+
+要求：
+
+1. Prompt 的任务类型必须严格使用下表“名称”列之一，不得自造或混用其他类别名称：
+
+| 名称 | 定义 | 典型输入 | 典型输出 |
+| --- | --- | --- | --- |
+| 代码生成 | 从需求描述出发，从零生成可运行的项目或模块 | PRD / 功能描述 | 可运行的项目代码 |
+| Bug 修复 / 调试 | 从 issue 或报错信息出发，定位并修复问题 | Bug 报告 / Stack trace / Failing test | 修复后的代码 + 回归测试 |
+| 代码重构 | 改善代码结构、性能或可维护性，行为保持不变 | 重构目标描述 + 现有代码库 | 重构后的代码 |
+| 功能迭代 | 在已有代码库上添加或修改功能 | 功能需求 + 现有代码库 | 新增 / 修改的代码 |
+| 测试 | 为已有代码编写或补全测试用例 | 待测代码 | 测试代码 |
+| 代码理解与分析 | 阅读代码并给出解释、审查意见或分析报告 | 代码库 / PR diff / 分析问题 | 结构化分析结果 |
+| DevOps / 工程化 | 配置 CI/CD、Docker、部署方案等工程基建 | 项目代码 + 工程化需求 | 配置文件 / 脚本 |
+
+2. Prompt 应尽量覆盖不同能力维度，并优先覆盖该仓库最核心、最容易暴露模型能力差异的业务链路和工程链路。
+
+3. 必须生成单独的 Excel 表格文件，用于集中维护所有 Prompt。
+   - Excel 文件名建议为：`prompts.xlsx`。
+   - Excel 文件必须放在 `repo` 文件夹的父目录中，例如仓库代码位于 `repo_0106/repo` 时，Prompt 表格应保存为 `repo_0106/prompts.xlsx`。
+   - Prompt 不要只写在最终回答中，必须写入该 Excel 文件。
+   - 如果后续需要新增 Prompt，必须在该 Excel 文件中新增行。
+   - 如果后续需要修改 Prompt，必须直接修改该 Excel 文件中对应行的内容。
+   - 不要为新增或修改另建零散文本文件，也不要只在聊天回复中给出 Prompt 正文。
+
+4. Excel 表格必须包含以下列，列名必须严格一致：
+   - 序号
+   - 难度
+   - 任务类型
+   - 技术栈
+   - 功能标签
+   - 具体的Prompt内容
+   - 验收方式
+   - 预期成果
+
+5. 表格字段填写要求：
+   - “序号”：从 1 开始递增，保持唯一。
+   - “难度”：填写“难度 1：简单”“难度 2：中等偏易”“难度 3：中等”“难度 4：中等偏难”“难度 5：困难”之一。
+   - “任务类型”：必须严格使用上表“名称”列之一。
+   - “技术栈”：填写该 Prompt 涉及的真实技术栈，例如 TypeScript、Fastify、Prisma、PostgreSQL、Jest、Docker 等。
+   - “功能标签”：多个标签用逗号分隔，例如 auth, import, matching, receivables, summary, prisma, docker。
+   - “具体的Prompt内容”：填写可直接复制给模型执行的完整用户 Prompt，必须包含任务目标、具体修改或分析要求和注意事项；不得要求模型自行运行测试、启动服务、调用 curl、打开浏览器或执行其他程序验证命令。
+   - “验收方式”：必须填写供评测者、插件或自动评测环境使用的 JSON 对象字符串，且必须包含 `steps` 和 `check_items` 两个顶层字段；这些内容用于后续评分和复核，不得写成要求模型自行执行的任务。
+     - `steps`：数组，每个元素表示一条验收步骤，必须包含 `step_number`、`title`、`command`，可按需包含 `timeout`、`cwd`。
+     - `check_items`：数组，每个元素可以是字符串，也可以是包含 `text` 和 `passed` 字段的对象；字符串表示待检查项，对象可表示带预设状态的检查项。
+     - `check_items` 中应覆盖自动化检查项和需要人工确认的检查项。对于只能通过浏览器实际观察、人工交互或主观判断确认的项目，应写成清晰的检查项，方便用户在插件中手动选择是否打钩。
+     - JSON 示例：
+       ```json
+       {
+         "steps": [
+           {
+             "step_number": 1,
+             "title": "安装依赖",
+             "command": "npm install"
+           },
+           {
+             "step_number": 2,
+             "title": "运行单元测试",
+             "command": "npm run test",
+             "timeout": 60000,
+             "cwd": "./src"
+           }
+         ],
+         "check_items": [
+           "检查测试覆盖率是否达到 80% 以上",
+           "确认测试日志中没有出现 error 或 warning 级别报错",
+           {
+             "text": "带预设状态的检查项（默认打钩）",
+             "passed": true
+           }
+         ]
+       }
+       ```
+   - “预期成果”：填写预期终端输出、测试结果、API 返回、页面可见结果或分析报告结构。
+
+6. Prompt 数量与难度要求：
+   - 必须输出不少于 8 条 Prompt，建议 8-12 条。
+   - 除“代码理解与分析”类 Prompt 外，其余 Prompt 要尽可能复杂，优先设计成多文件、多步骤、多验收条件的高区分度任务。
+   - 不要求 Prompt 难度均匀分布；除“代码理解与分析”外，原则上应优先设计为难度 4 或难度 5。
+   - Prompt 本身不得出现任何特定待评测模型名称，也不得出现“为了让某模型失败”等针对特定模型的表述。
+
+7. Prompt 设计必须高度显性、可由评测者实时验证。
+   - Prompt 正文中不得要求模型自行运行测试、启动服务、调用 API、执行 curl、查看页面、打印日志或通过命令验证结果。
+   - 可以在“验收方式”列的 JSON `steps` 中写明评测者、插件或自动评测环境应如何运行测试、启动服务、调用 API、查看页面或检查输出。
+   - 如果是 API 功能，应在“验收方式”列的 JSON `steps` 中提供可复核的 curl 验证方案，但不要要求模型自行执行 curl。
+   - 如果是测试类功能，应要求模型编写或补全测试代码；测试运行命令只写在“验收方式”列的 JSON `steps` 中，供评测者执行。
+   - 严禁只要求模型做外部看不出来的底层暗改；每条 Prompt 都必须有清晰的外部验收标准。
+
+8. Prompt 需要适合在 Docker 容器内部执行。
+   - 所有代码修改默认发生在配置好的 Docker 容器内。
+   - “验收方式”列 JSON `steps` 中的运行、测试、启动、curl 等命令必须能在容器内执行。
+
+---
+
+## Prompt A 最终输出格式
+
+请直接输出以下内容：
+
+1. Dockerfile 代码块
+2. docker-compose.yml 代码块
+3. Prompt Excel 表格文件路径
+4. 简要说明 Excel 中共生成了多少条 Prompt，以及覆盖了哪些任务类型
+
+Prompt 具体内容必须以 Excel 表格文件为准，不要在最终回答中重复粘贴所有 Prompt 正文。
+
+---
+

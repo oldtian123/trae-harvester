@@ -1,0 +1,9 @@
+﻿本文件已拆分为两个独立 Prompt 文件：
+
+1. 01_生成Docker与评测Prompt表格.txt
+   用途：仓库分析、Dockerfile/docker-compose.yml 生成、prompts.xlsx 评测 Prompt 表格生成。
+
+2. 02_模型结果评分Prompt.txt
+   用途：基于 prompts.xlsx、插件导出的 *_result.json、*.patch 和补充材料，对模型完成质量进行 0/1/2 分评分。
+
+使用时请按任务选择对应文件，不要再使用旧的混合版 Prompt。
