@@ -201,115 +201,162 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
     <title>Test Steps</title>
 </head>
 <body>
+    <!-- Toast Container (Absolute within sidebar) -->
+    <div id="toast-container"></div>
+
     <div class="container">
-        <div class="header" style="margin-bottom: var(--spacing-sm);">
-            <h2>🎛️ Harvester 工具箱</h2>
-            <div class="actions" style="margin-bottom: 8px;">
+        <!-- Global Tools Card -->
+        <div class="section-card">
+            <div class="section-header">
+                <span>🎛️ Harvester 工具箱</span>
+            </div>
+            
+            <div class="actions-grid">
                 <button id="btn-toggle-mcp" class="btn btn-secondary" title="开启或关闭 MCP Server (供大模型连接)">
-                    🔴 启动 MCP
-                </button>
-                <button id="btn-open-settings" class="btn btn-secondary" title="配置插件参数">
-                    ⚙️ 插件设置
+                    <span class="icon-normal">🔴</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">启动 MCP</span>
                 </button>
                 <button id="btn-check-updates" class="btn btn-secondary" title="检查并安装最新版本">
-                    🔄 检查更新
+                    <span class="icon-normal">🔄</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">检查更新</span>
                 </button>
-                <button id="btn-clear-all" class="btn btn-secondary" title="一键清除当前测试计划、结果和上下文" style="color: var(--vscode-errorForeground);">
-                    🗑️ 全部清除
+                <button id="btn-open-settings" class="btn btn-secondary" title="配置插件参数">
+                    <span class="icon-normal">⚙️</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">插件设置</span>
+                </button>
+                <button id="btn-clear-all" class="btn btn-danger" title="一键清除当前测试计划、结果和上下文">
+                    <span class="icon-normal">🗑️</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">全部清除</span>
                 </button>
             </div>
-            <div class="actions">
+            
+            <div style="margin-top: var(--spacing-sm); height: 1px; background: var(--card-border);"></div>
+            
+            <div class="actions-grid full" style="margin-top: var(--spacing-sm);">
                 <button id="btn-export-patch" class="btn btn-secondary" title="一键导出 Git Patch">
-                    📦 导出 Patch
+                    <span class="icon-normal">📦</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">导出 Patch</span>
                 </button>
                 <button id="btn-export-logs" class="btn btn-secondary" title="一键导出插件运行调试日志">
-                    📝 导出调试日志
+                    <span class="icon-normal">📝</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">导出调试日志</span>
                 </button>
                 <button id="btn-export-results" class="btn btn-secondary" title="一键导出测试执行结果及验收项">
-                    📊 导出测试结果
+                    <span class="icon-normal">📊</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">导出测试结果</span>
                 </button>
             </div>
         </div>
 
-        <div class="steps-container">
-            <h2>📋 测试编排与执行</h2>
-            <div class="actions" style="margin-bottom: var(--spacing-sm);">
+        <!-- Test Execution Card -->
+        <div class="section-card">
+            <div class="section-header">
+                <span>📋 测试编排与执行</span>
+            </div>
+            
+            <div class="actions-grid">
                 <button id="btn-show-add-menu" class="btn btn-secondary" title="添加或导入用例">
-                    ➕ 添加...
+                    <span class="icon-normal">➕</span>
+                    <span class="btn-text">添加...</span>
                 </button>
                 <button id="btn-copy-json" class="btn btn-secondary" title="将当前用例复制为 JSON 文本">
-                    📑 复制 JSON
+                    <span class="icon-normal">📑</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">复制 JSON</span>
                 </button>
                 <button id="btn-reset-results" class="btn btn-secondary" title="重置当前所有测试的执行状态和终端输出">
-                    🔄 重置状态
+                    <span class="icon-normal">🔄</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">重置状态</span>
                 </button>
+            </div>
+
+            <!-- 1. 子菜单面板 (Sub Menu) -->
+            <div id="sub-menu-add" class="panel-container">
+                <div class="panel-header">选择操作 <span class="panel-close" id="btn-close-sub-menu" title="关闭">✖</span></div>
+                <div class="actions-grid full" style="gap: 4px;">
+                    <button id="btn-input" class="btn btn-secondary" style="justify-content: flex-start">
+                        <span class="icon-normal">📥</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">从 JSON 导入</span>
+                    </button>
+                    <button id="btn-show-add-step" class="btn btn-secondary" style="justify-content: flex-start">
+                        <span class="icon-normal">📝</span>
+                        <span class="btn-text">添加测试命令</span>
+                    </button>
+                    <button id="btn-show-add-check" class="btn btn-secondary" style="justify-content: flex-start">
+                        <span class="icon-normal">📋</span>
+                        <span class="btn-text">添加检查项</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. 添加命令面板 -->
+            <div id="panel-add-step" class="panel-container">
+                <div class="panel-header">添加测试命令 <span class="panel-close" id="btn-close-add-step" title="关闭">✖</span></div>
+                <input type="text" id="input-step-title" class="input-field" placeholder="步骤标题">
+                <input type="text" id="input-step-command" class="input-field" placeholder="执行命令 (如 npm run test)">
+                <button id="btn-add-step" class="btn btn-primary" style="width: 100%">添加指令</button>
+            </div>
+
+            <!-- 3. 添加检查项面板 -->
+            <div id="panel-add-check" class="panel-container">
+                <div class="panel-header">添加人工检查项 <span class="panel-close" id="btn-close-add-check" title="关闭">✖</span></div>
+                <input type="text" id="input-check-item" class="input-field" placeholder="检查项内容">
+                <button id="btn-add-check" class="btn btn-primary" style="width: 100%">添加检查项</button>
+            </div>
+
+            <div class="actions-grid full" style="margin-top: var(--spacing-sm);">
                 <button id="btn-run-all" class="btn btn-primary" title="一键执行所有步骤" disabled>
-                    ▶ 全部执行
+                    <span class="icon-normal">▶</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">全部执行</span>
                 </button>
             </div>
 
-            <!-- 子菜单 -->
-            <div id="sub-menu-add" class="sub-menu-panel" style="display: none;">
-                <button class="btn-close" id="btn-close-sub-menu" title="关闭">×</button>
-                <div class="sub-menu-items">
-                    <button id="btn-input" class="btn btn-secondary">📥 从 JSON 导入</button>
-                    <button id="btn-show-add-step" class="btn btn-secondary">📝 添加测试命令</button>
-                    <button id="btn-show-add-check" class="btn btn-secondary">📋 添加检查项</button>
-                </div>
+            <!-- Summary & Check Items & Steps List -->
+            <div id="summary" class="summary" style="display: none; margin-top: var(--spacing-sm);">
+                <span id="summary-icon"></span>
+                <span id="summary-text" style="font-weight: 600;"></span>
             </div>
 
-            <!-- 添加命令面板 -->
-            <div id="panel-add-step" class="input-panel" style="display: none;">
-                <button class="btn-close" id="btn-close-add-step" title="关闭">×</button>
-                <div class="section-title">添加测试命令</div>
-                <div class="form-group">
-                    <input type="text" id="input-step-title" class="input-field" placeholder="步骤描述 (如: 运行测试)" />
-                    <input type="text" id="input-step-command" class="input-field" placeholder="执行命令 (如: npm run test)" />
-                    <button id="btn-add-step" class="btn btn-secondary">确认添加</button>
-                </div>
+            <div id="check-items-section" class="check-items-section" style="display: none; margin-top: var(--spacing-sm);">
+                <div class="section-header" style="margin-bottom: 8px;">✅ 人工检查项</div>
+                <div id="check-items-list"></div>
             </div>
 
-            <!-- 添加检查项面板 -->
-            <div id="panel-add-check" class="input-panel" style="display: none;">
-                <button class="btn-close" id="btn-close-add-check" title="关闭">×</button>
-                <div class="section-title">添加验收检查项</div>
-                <div class="form-group">
-                    <input type="text" id="input-check-item" class="input-field" placeholder="新增检查项..." />
-                    <button id="btn-add-check" class="btn btn-secondary">确认添加</button>
-                </div>
+            <div id="empty-state" class="empty-state" style="margin-top: 30px;">
+                <div style="font-size: 24px; margin-bottom: 8px;">📭</div>
+                <div>暂无测试步骤</div>
+                <div class="hint">点上方添加或 MCP 导入</div>
             </div>
 
+            <div id="steps-list" class="steps-list" style="margin-top: var(--spacing-sm);"></div>
         </div>
 
-        <div id="empty-state" class="empty-state">
-            <p>暂无测试步骤</p>
-            <p class="hint">点击"📥 输入"按钮粘贴 AI 生成的测试步骤 JSON</p>
-        </div>
-
-        <div id="steps-list" class="steps-list" style="display: none;"></div>
-
-        <div id="summary" class="summary" style="display: none;">
-            <div class="summary-bar">
-                <span id="summary-icon">📊</span>
-                <span id="summary-text">等待执行...</span>
+        <!-- AI Context Card -->
+        <div class="section-card">
+            <div class="section-header">
+                <span>🧠 AI 思考上下文 (Evidence)</span>
             </div>
-        </div>
-
-        <!-- 检查项列表 -->
-        <div class="check-items-section" id="check-items-section" style="display: none; margin-top: var(--spacing-sm);">
-            <div class="section-title">验收检查项</div>
-            <div id="check-items-list" class="check-items-list">
-                <!-- 检查项将由 JS 动态渲染 -->
+            <textarea id="input-ai-context" class="input-field" rows="4" placeholder="将 AI 生成的思考过程或代码分析粘贴在这里..." style="resize: vertical;"></textarea>
+            <div class="actions-grid full" style="margin-top: 4px;">
+                <button id="btn-save-ai-context" class="btn btn-primary">
+                    <span class="icon-normal">💾</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">保存上下文</span>
+                </button>
             </div>
-        </div>
-        
-        <div class="ai-context-container" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--vscode-panel-border);">
-            <h3 style="margin-top: 0; margin-bottom: 8px;">🧠 AI 思考上下文</h3>
-            <textarea id="input-ai-context" rows="4" style="width: 100%; resize: vertical; margin-bottom: 8px; font-family: var(--vscode-font-family); background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 4px;" placeholder="在这里粘贴 AI 生成的思考上下文或对话记录..."></textarea>
-            <button id="btn-save-ai-context" class="btn btn-primary" style="width: 100%;">📝 保存 AI 上下文</button>
         </div>
     </div>
-
+    
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

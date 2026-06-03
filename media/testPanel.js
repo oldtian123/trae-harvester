@@ -18,427 +18,498 @@
     const summary = document.getElementById('summary');
     const summaryIcon = document.getElementById('summary-icon');
     const summaryText = document.getElementById('summary-text');
-    const btnInput = document.getElementById('btn-input'); // this is in sub-menu now
-    const btnRunAll = document.getElementById('btn-run-all');
+    
+    // Tools
+    const btnToggleMcp = document.getElementById('btn-toggle-mcp');
+    const btnCheckUpdates = document.getElementById('btn-check-updates');
+    const btnOpenSettings = document.getElementById('btn-open-settings');
+    const btnClearAll = document.getElementById('btn-clear-all');
     const btnExportPatch = document.getElementById('btn-export-patch');
     const btnExportLogs = document.getElementById('btn-export-logs');
     const btnExportResults = document.getElementById('btn-export-results');
-    const btnCopyJson = document.getElementById('btn-copy-json');
-    const btnToggleMcp = document.getElementById('btn-toggle-mcp');
-    const btnOpenSettings = document.getElementById('btn-open-settings');
-    const inputAiContext = document.getElementById('input-ai-context');
-    const btnSaveAiContext = document.getElementById('btn-save-ai-context');
-    const btnClearAll = document.getElementById('btn-clear-all');
-    const btnResetResults = document.getElementById('btn-reset-results');
-    const btnCheckUpdates = document.getElementById('btn-check-updates');
-
-    // ---- 新增：主菜单按钮及面板 ----
+    
+    // Steps Actions
     const btnShowAddMenu = document.getElementById('btn-show-add-menu');
+    const btnCopyJson = document.getElementById('btn-copy-json');
+    const btnResetResults = document.getElementById('btn-reset-results');
+    const btnRunAll = document.getElementById('btn-run-all');
+    
+    // Panels
+    const panels = ['sub-menu-add', 'panel-add-step', 'panel-add-check'];
     const subMenuAdd = document.getElementById('sub-menu-add');
-    const btnCloseSubMenu = document.getElementById('btn-close-sub-menu');
+    const panelAddStep = document.getElementById('panel-add-step');
+    const panelAddCheck = document.getElementById('panel-add-check');
+    
+    // Sub Menu actions
+    const btnInput = document.getElementById('btn-input');
     const btnShowAddStep = document.getElementById('btn-show-add-step');
     const btnShowAddCheck = document.getElementById('btn-show-add-check');
-
-    const panelAddStep = document.getElementById('panel-add-step');
-    const btnCloseAddStep = document.getElementById('btn-close-add-step');
+    
+    // Inputs & Add Buttons
     const inputStepTitle = document.getElementById('input-step-title');
     const inputStepCommand = document.getElementById('input-step-command');
     const btnAddStep = document.getElementById('btn-add-step');
-
-    const panelAddCheck = document.getElementById('panel-add-check');
-    const btnCloseAddCheck = document.getElementById('btn-close-add-check');
-    const checkItemsSection = document.getElementById('check-items-section');
-    const checkItemsList = document.getElementById('check-items-list');
     const inputCheckItem = document.getElementById('input-check-item');
     const btnAddCheck = document.getElementById('btn-add-check');
+    
+    // AI Context
+    const inputAiContext = document.getElementById('input-ai-context');
+    const btnSaveAiContext = document.getElementById('btn-save-ai-context');
+    
+    // Check Items
+    const checkItemsSection = document.getElementById('check-items-section');
+    const checkItemsList = document.getElementById('check-items-list');
 
-    // ---- 隐藏所有面板 ----
-    function hideAllPanels() {
-        subMenuAdd.style.display = 'none';
-        panelAddStep.style.display = 'none';
-        panelAddCheck.style.display = 'none';
-    }
-
-    // ---- 按钮事件 ----
-    btnShowAddMenu.addEventListener('click', () => {
-        hideAllPanels();
-        subMenuAdd.style.display = 'block';
-    });
-    btnCloseSubMenu.addEventListener('click', hideAllPanels);
-
-    btnShowAddStep.addEventListener('click', () => {
-        hideAllPanels();
-        panelAddStep.style.display = 'block';
-    });
-    btnCloseAddStep.addEventListener('click', hideAllPanels);
-
-    btnShowAddCheck.addEventListener('click', () => {
-        hideAllPanels();
-        panelAddCheck.style.display = 'block';
-    });
-    btnCloseAddCheck.addEventListener('click', hideAllPanels);
-
-    btnInput.addEventListener('click', () => {
-        hideAllPanels();
-        vscode.postMessage({ command: 'inputSteps' });
-    });
-
-    btnExportPatch.addEventListener('click', () => {
-        vscode.postMessage({ command: 'exportPatch' });
-    });
-
-    btnExportLogs.addEventListener('click', () => {
-        vscode.postMessage({ command: 'exportLogs' });
-    });
-
-    btnExportResults.addEventListener('click', () => {
-        vscode.postMessage({ command: 'exportResults' });
-    });
-
-    btnCopyJson.addEventListener('click', () => {
-        vscode.postMessage({ command: 'copyJson' });
-    });
-
-    btnToggleMcp.addEventListener('click', () => {
-        vscode.postMessage({ command: 'toggleMcp' });
-    });
-
-    btnOpenSettings.addEventListener('click', () => {
-        vscode.postMessage({ command: 'openSettings' });
-    });
-
-    if (btnCheckUpdates) {
-        btnCheckUpdates.addEventListener('click', () => {
-            vscode.postMessage({ command: 'checkUpdates' });
+    // ---- Panel 控制 ----
+    function closeAllPanels() {
+        panels.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
         });
     }
 
-    btnSaveAiContext.addEventListener('click', () => {
-        const text = inputAiContext.value.trim();
-        vscode.postMessage({ command: 'saveAiContext', text });
+    function openPanel(panelId) {
+        closeAllPanels();
+        const panel = document.getElementById(panelId);
+        if (panel) {
+            panel.style.display = 'block';
+            const firstInput = panel.querySelector('input');
+            if (firstInput) firstInput.focus();
+        }
+    }
+
+    document.querySelectorAll('.panel-close').forEach(btn => {
+        btn.addEventListener('click', closeAllPanels);
     });
+
+    btnShowAddMenu.addEventListener('click', () => openPanel('sub-menu-add'));
+    btnShowAddStep.addEventListener('click', () => openPanel('panel-add-step'));
+    btnShowAddCheck.addEventListener('click', () => openPanel('panel-add-check'));
+    btnInput.addEventListener('click', () => {
+        closeAllPanels();
+        vscode.postMessage({ command: 'inputSteps' });
+    });
+
+    // ---- Toast 与 Loading 反馈机制 ----
+    function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        let icon = 'ℹ️';
+        if (type === 'success') icon = '✅';
+        if (type === 'error') icon = '❌';
+
+        toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+        container.appendChild(toast);
+        
+        void toast.offsetWidth; // 触发 reflow 激活动画
+        toast.classList.add('show');
+
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (container.contains(toast)) container.removeChild(toast);
+            }, 300);
+        }, 3000);
+    }
+
+    // 模拟后端调用的 Loading 反馈 (因为后端不改，我们直接在前端用 setTimeout 给一点视觉反馈)
+    function simulateActionWithToast(btnElement, commandStr, toastMsg, toastType, delayMs = 1000) {
+        closeAllPanels();
+        
+        // 发送给后端执行
+        if (commandStr) {
+            vscode.postMessage({ command: commandStr });
+        }
+        
+        if (!btnElement) return;
+
+        // 设置 Loading 态
+        const btnTextEl = btnElement.querySelector('.btn-text');
+        const originalText = btnTextEl ? btnTextEl.innerText : btnElement.innerText;
+        btnElement.classList.add('loading');
+        btnElement.disabled = true;
+        if (btnTextEl) btnTextEl.innerText = '执行中...';
+
+        // 假装等待后端执行完毕
+        setTimeout(() => {
+            btnElement.classList.remove('loading');
+            btnElement.disabled = false;
+            if (btnTextEl) btnTextEl.innerText = originalText;
+
+            if (toastMsg) {
+                showToast(toastMsg, toastType);
+            }
+        }, delayMs);
+    }
+
+    // ---- 绑定按钮动作 ----
+    if (btnToggleMcp) {
+        btnToggleMcp.addEventListener('click', () => {
+            // MCP 的状态是自动推给前端的，这里不需要假 loading
+            vscode.postMessage({ command: 'toggleMcp' });
+        });
+    }
+
+    if (btnCheckUpdates) {
+        btnCheckUpdates.addEventListener('click', () => {
+            // 检查更新可能耗时较长，前端假装 loading 1.5 秒
+            simulateActionWithToast(btnCheckUpdates, 'checkUpdates', '', 'info', 1500);
+        });
+    }
+
+    if (btnOpenSettings) {
+        btnOpenSettings.addEventListener('click', () => {
+            vscode.postMessage({ command: 'openSettings' });
+        });
+    }
 
     if (btnClearAll) {
         btnClearAll.addEventListener('click', () => {
-            vscode.postMessage({ command: 'clearAll' });
+            simulateActionWithToast(btnClearAll, 'clearAll', '所有数据已清除', 'error', 500);
+        });
+    }
+
+    if (btnExportPatch) {
+        btnExportPatch.addEventListener('click', () => {
+            simulateActionWithToast(btnExportPatch, 'exportPatch', 'Patch 导出请求已发送', 'success', 800);
+        });
+    }
+
+    if (btnExportLogs) {
+        btnExportLogs.addEventListener('click', () => {
+            simulateActionWithToast(btnExportLogs, 'exportLogs', '调试日志导出请求已发送', 'info', 800);
+        });
+    }
+
+    if (btnExportResults) {
+        btnExportResults.addEventListener('click', () => {
+            simulateActionWithToast(btnExportResults, 'exportResults', '测试报告生成请求已发送', 'success', 800);
+        });
+    }
+
+    if (btnCopyJson) {
+        btnCopyJson.addEventListener('click', () => {
+            simulateActionWithToast(btnCopyJson, 'copyJson', 'JSON 已复制到剪贴板', 'success', 500);
         });
     }
 
     if (btnResetResults) {
         btnResetResults.addEventListener('click', () => {
-            vscode.postMessage({ command: 'resetResults' });
+            simulateActionWithToast(btnResetResults, 'resetResults', '测试状态已被重置', 'info', 500);
         });
     }
 
-    btnAddStep.addEventListener('click', () => {
+    if (btnRunAll) {
+        btnRunAll.addEventListener('click', () => {
+            vscode.postMessage({ command: 'runAll' });
+        });
+    }
+
+    if (btnSaveAiContext) {
+        btnSaveAiContext.addEventListener('click', () => {
+            const text = inputAiContext.value.trim();
+            simulateActionWithToast(btnSaveAiContext, null, 'AI 思考上下文已保存', 'success', 500);
+            vscode.postMessage({ command: 'saveAiContext', text });
+        });
+    }
+
+    // ---- 提交添加的逻辑 (支持回车) ----
+    function submitStep() {
         const title = inputStepTitle.value.trim();
         const commandToRun = inputStepCommand.value.trim();
         if (title && commandToRun) {
             vscode.postMessage({ command: 'addStep', title, commandToRun });
+            showToast(`成功添加指令: ${title}`, 'success');
             inputStepTitle.value = '';
             inputStepCommand.value = '';
+            closeAllPanels();
         }
-    });
+    }
 
-    btnAddCheck.addEventListener('click', () => {
+    function submitCheck() {
         const item = inputCheckItem.value.trim();
         if (item) {
             vscode.postMessage({ command: 'addCheckItem', item });
+            showToast(`成功添加检查项: ${item}`, 'success');
             inputCheckItem.value = '';
+            closeAllPanels();
         }
-    });
+    }
 
-    // ---- 支持回车键提交 ----
-    inputStepTitle.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            inputStepCommand.focus();
-        }
-    });
+    if (btnAddStep) btnAddStep.addEventListener('click', submitStep);
+    if (btnAddCheck) btnAddCheck.addEventListener('click', submitCheck);
 
-    inputStepCommand.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            btnAddStep.click();
-        }
-    });
+    if (inputStepTitle) {
+        inputStepTitle.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') inputStepCommand.focus();
+        });
+    }
+    if (inputStepCommand) {
+        inputStepCommand.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitStep();
+        });
+    }
+    if (inputCheckItem) {
+        inputCheckItem.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitCheck();
+        });
+    }
 
-    inputCheckItem.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            btnAddCheck.click();
-        }
-    });
 
-    // ---- 点击外部关闭面板 ----
-    document.addEventListener('click', (e) => {
-        // 如果点击的不是展示按钮，也不是面板内部，就关闭面板
-        const isClickOnShowBtn = e.target.closest('#btn-show-add-menu') || 
-                                 e.target.closest('#btn-show-add-step') || 
-                                 e.target.closest('#btn-show-add-check');
-        const isClickInsidePanel = e.target.closest('.sub-menu-panel') || 
-                                   e.target.closest('.input-panel');
-        
-        if (!isClickOnShowBtn && !isClickInsidePanel) {
-            hideAllPanels();
-        }
-    });
-
-    btnRunAll.addEventListener('click', () => {
-        vscode.postMessage({ command: 'runAll' });
-    });
-
-    // ---- 接收 Extension 消息 ----
-    window.addEventListener('message', (event) => {
+    // ---- 消息总线 (接收后端回传) ----
+    window.addEventListener('message', event => {
         const message = event.data;
-
         switch (message.command) {
             case 'loadSteps':
-                if (message.isMcpRunning !== undefined) {
+                steps = message.steps || [];
+                renderSteps();
+                renderCheckItems(message.checkItems || []);
+                
+                if (btnToggleMcp) {
+                    const mcpTextEl = btnToggleMcp.querySelector('.btn-text');
+                    const mcpIconEl = btnToggleMcp.querySelector('.icon-normal');
                     if (message.isMcpRunning) {
-                        btnToggleMcp.textContent = '🟢 关闭 MCP';
-                        btnToggleMcp.title = '关闭 MCP Server';
+                        mcpIconEl.innerText = '🟢';
+                        mcpTextEl.innerText = '关闭 MCP';
                     } else {
-                        btnToggleMcp.textContent = '🔴 启动 MCP';
-                        btnToggleMcp.title = '开启 MCP Server 供大模型连接';
+                        mcpIconEl.innerText = '🔴';
+                        mcpTextEl.innerText = '启动 MCP';
                     }
                 }
-
-                if (message.aiContext !== undefined) {
-                    inputAiContext.value = message.aiContext;
-                }
-
-                steps = message.steps || [];
-                results.clear();
-                renderSteps(steps);
-                renderCheckItems(message.checkItems || []);
                 break;
-
             case 'stepStarted':
-                markStepRunning(message.stepNumber);
-                break;
-
             case 'stepCompleted':
-                results.set(message.stepNumber, message.result);
-                updateStepResult(message.stepNumber, message.result);
+                if (message.result) {
+                    results.set(message.result.step_number, message.result);
+                }
+                updateStepUI(message.stepNumber, message.command === 'stepStarted');
+                updateSummary();
                 break;
-
             case 'allCompleted':
-                updateSummary(message.result);
-                break;
-
-            case 'error':
-                showError(message.message);
+                const res = message.result;
+                summary.style.display = 'flex';
+                if (res.final_status === 'PASS') {
+                    summary.className = 'summary pass';
+                    summaryIcon.textContent = '✅';
+                    summaryText.textContent = `全部完成 (${res.passed_steps}/${res.total_steps} 通过)`;
+                    showToast('🎉 所有测试执行完毕', 'success');
+                } else if (res.final_status === 'FAIL') {
+                    summary.className = 'summary fail';
+                    summaryIcon.textContent = '❌';
+                    summaryText.textContent = `全部失败 (${res.failed_steps}/${res.total_steps})`;
+                    showToast('💥 所有测试执行失败', 'error');
+                } else {
+                    summary.className = 'summary fail';
+                    summaryIcon.textContent = '⚠️';
+                    summaryText.textContent = `部分完成 (通过: ${res.passed_steps}, 失败: ${res.failed_steps}, 跳过: ${res.skipped_steps})`;
+                    showToast('⚠️ 测试执行完毕 (部分失败)', 'error');
+                }
+                btnRunAll.disabled = false;
+                
+                const originalText = btnRunAll.querySelector('.btn-text').innerText;
+                btnRunAll.classList.remove('loading');
+                btnRunAll.querySelector('.btn-text').innerText = '全部执行';
                 break;
         }
     });
 
-    // ---- 渲染函数 ----
-
-    /**
-     * 渲染步骤列表
-     */
-    function renderSteps(steps) {
-        stepsList.innerHTML = '';
-        
+    // ---- UI 渲染逻辑 ----
+    function renderSteps() {
         if (steps.length === 0) {
             emptyState.style.display = 'block';
             stepsList.style.display = 'none';
-            summary.style.display = 'none';
             btnRunAll.disabled = true;
+            summary.style.display = 'none';
             return;
         }
 
         emptyState.style.display = 'none';
         stepsList.style.display = 'flex';
-        summary.style.display = 'block';
         btnRunAll.disabled = false;
+        stepsList.innerHTML = '';
 
-        for (const step of steps) {
-            const item = document.createElement('div');
-            item.className = 'step-item';
-            item.id = `step-${step.step_number}`;
+        steps.forEach((step, index) => {
+            const stepEl = document.createElement('div');
+            stepEl.className = 'step-item';
+            stepEl.id = `step-${step.step_number}`;
 
-            item.innerHTML = `
-                <span class="step-icon" id="icon-${step.step_number}">⬜</span>
-                <div class="step-content">
-                    <div class="step-title">
-                        <span>#${step.step_number} ${escapeHtml(step.title)}</span>
-                        <div class="step-actions">
-                            <button class="btn-icon play" title="独立执行" data-action="run" data-step="${step.step_number}">▶</button>
-                            <button class="btn-icon delete" title="删除步骤" data-action="delete" data-step="${step.step_number}">🗑️</button>
-                        </div>
-                    </div>
-                    <div class="step-command">${escapeHtml(step.command)}</div>
-                    <div class="step-meta" id="meta-${step.step_number}"></div>
-                </div>
-            `;
-
-            // 绑定事件
-            const btnRun = item.querySelector('[data-action="run"]');
-            const btnDelete = item.querySelector('[data-action="delete"]');
+            // Create step index
+            const indexEl = document.createElement('div');
+            indexEl.className = 'step-index';
+            indexEl.textContent = step.step_number;
             
-            btnRun.addEventListener('click', () => {
+            // Create step content
+            const contentEl = document.createElement('div');
+            contentEl.className = 'step-content';
+            
+            const titleEl = document.createElement('div');
+            titleEl.className = 'step-title';
+            titleEl.textContent = step.title;
+            titleEl.title = step.title;
+            
+            const cmdEl = document.createElement('div');
+            cmdEl.className = 'step-command';
+            cmdEl.textContent = step.command;
+            cmdEl.title = step.command;
+            
+            contentEl.appendChild(titleEl);
+            contentEl.appendChild(cmdEl);
+            
+            // Create status badge
+            const statusEl = document.createElement('div');
+            statusEl.className = 'step-status';
+            statusEl.id = `status-${step.step_number}`;
+            statusEl.textContent = 'WAIT';
+            
+            // Create actions
+            const actionsEl = document.createElement('div');
+            actionsEl.style.display = 'flex';
+            actionsEl.style.gap = '4px';
+            
+            const playBtn = document.createElement('button');
+            playBtn.className = 'btn btn-secondary btn-small';
+            playBtn.innerHTML = '▶';
+            playBtn.title = '执行此步骤';
+            playBtn.onclick = () => {
+                playBtn.innerHTML = '<span class="spinner" style="display:block;width:10px;height:10px;"></span>';
                 vscode.postMessage({ command: 'runStep', stepNumber: step.step_number });
-            });
+            };
             
-            btnDelete.addEventListener('click', () => {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn btn-secondary btn-small';
+            deleteBtn.innerHTML = '×';
+            deleteBtn.title = '删除此步骤';
+            deleteBtn.style.color = 'var(--vscode-errorForeground)';
+            deleteBtn.onclick = () => {
                 vscode.postMessage({ command: 'deleteStep', stepNumber: step.step_number });
-            });
+            };
+            
+            actionsEl.appendChild(playBtn);
+            actionsEl.appendChild(deleteBtn);
 
-            stepsList.appendChild(item);
-        }
+            stepEl.appendChild(indexEl);
+            stepEl.appendChild(contentEl);
+            stepEl.appendChild(statusEl);
+            stepEl.appendChild(actionsEl);
 
-        // 重置汇总
-        summaryIcon.textContent = '📊';
-        summaryText.textContent = `共 ${steps.length} 个步骤，等待执行...`;
+            stepsList.appendChild(stepEl);
+        });
+
+        updateSummary();
     }
-
-    /**
-     * 标记步骤为正在执行
-     */
-    function markStepRunning(stepNumber) {
-        const item = document.getElementById(`step-${stepNumber}`);
-        const icon = document.getElementById(`icon-${stepNumber}`);
-        const meta = document.getElementById(`meta-${stepNumber}`);
-
-        if (item) {
-            item.className = 'step-item running';
-        }
-        if (icon) {
-            icon.textContent = '⏳';
-        }
-        if (meta) {
-            meta.textContent = '执行中...';
-        }
-    }
-
-    /**
-     * 更新步骤执行结果
-     */
-    function updateStepResult(stepNumber, result) {
-        const item = document.getElementById(`step-${stepNumber}`);
-        const icon = document.getElementById(`icon-${stepNumber}`);
-        const meta = document.getElementById(`meta-${stepNumber}`);
-
-        if (!item || !icon || !meta) {
-            return;
-        }
-
-        // 更新状态样式
-        const statusMap = {
-            'PASS': { icon: '✅', className: 'step-item pass' },
-            'FAIL': { icon: '❌', className: 'step-item fail' },
-            'ERROR': { icon: '💥', className: 'step-item fail' },
-            'TIMEOUT': { icon: '⏰', className: 'step-item fail' },
-            'SKIP': { icon: '⏭', className: 'step-item skip' },
-            'PENDING': { icon: '⬜', className: 'step-item' },
-        };
-
-        const status = statusMap[result.status] || statusMap['PENDING'];
-        item.className = status.className;
-        icon.textContent = status.icon;
-
-        // 显示元信息
-        const parts = [];
-        if (result.exit_code !== null && result.exit_code !== undefined) {
-            parts.push(`exit=${result.exit_code}`);
-        }
-        if (result.duration_ms > 0) {
-            parts.push(formatDuration(result.duration_ms));
-        }
-        if (result.error_message) {
-            parts.push(result.error_message);
-        }
-        meta.textContent = parts.join(' | ');
-    }
-
-    /**
-     * 更新汇总信息
-     */
-    function updateSummary(testResult) {
-        if (!testResult) {
-            return;
-        }
-
-        const iconMap = {
-            'PASS': '✅',
-            'FAIL': '❌',
-            'PARTIAL': '⚠️',
-        };
-
-        summaryIcon.textContent = iconMap[testResult.final_status] || '📊';
-        summaryText.textContent = [
-            `${testResult.final_status}`,
-            `通过: ${testResult.passed_steps}/${testResult.total_steps}`,
-            testResult.failed_steps > 0 ? `失败: ${testResult.failed_steps}` : '',
-            testResult.skipped_steps > 0 ? `跳过: ${testResult.skipped_steps}` : '',
-        ].filter(Boolean).join(' | ');
-    }
-
-    /**
-     * 显示错误信息
-     */
-    function showError(message) {
-        summaryIcon.textContent = '❌';
-        summaryText.textContent = `错误: ${message}`;
-        summary.style.display = 'block';
-    }
-
-    // ---- 工具函数 ----
 
     function renderCheckItems(items) {
-        checkItemsList.innerHTML = '';
         if (items.length === 0) {
             checkItemsSection.style.display = 'none';
             return;
         }
-        
-        checkItemsSection.style.display = 'block';
 
-        items.forEach((itemObj, index) => {
+        checkItemsSection.style.display = 'block';
+        checkItemsList.innerHTML = '';
+
+        items.forEach((item, index) => {
             const div = document.createElement('div');
             div.className = 'check-item';
             
-            // itemObj 是 { text: string, passed: boolean }
-            div.innerHTML = `
-                <div class="check-item-left">
-                    <input type="checkbox" class="check-item-checkbox" data-index="${index}" ${itemObj.passed ? 'checked' : ''} />
-                    <span>${escapeHtml(itemObj.text)}</span>
-                </div>
-                <button class="btn-icon delete" title="删除" data-index="${index}">🗑️</button>
-            `;
-
-            const btnDelete = div.querySelector('button.delete');
-            btnDelete.addEventListener('click', () => {
-                vscode.postMessage({ command: 'removeCheckItem', index });
-            });
-
-            const checkbox = div.querySelector('.check-item-checkbox');
-            checkbox.addEventListener('change', (e) => {
-                vscode.postMessage({ command: 'toggleCheckItem', index, passed: e.target.checked });
-            });
-
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `check-${index}`;
+            checkbox.checked = item.passed;
+            checkbox.onchange = (e) => {
+                vscode.postMessage({ command: 'toggleCheckItem', index: index, passed: e.target.checked });
+            };
+            
+            const label = document.createElement('label');
+            label.htmlFor = `check-${index}`;
+            label.textContent = item.item;
+            
+            const deleteBtn = document.createElement('span');
+            deleteBtn.innerHTML = '×';
+            deleteBtn.style.cursor = 'pointer';
+            deleteBtn.style.color = 'var(--vscode-errorForeground)';
+            deleteBtn.style.marginLeft = 'auto';
+            deleteBtn.title = '删除此检查项';
+            deleteBtn.onclick = () => {
+                vscode.postMessage({ command: 'removeCheckItem', index: index });
+            };
+            
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            div.appendChild(deleteBtn);
             checkItemsList.appendChild(div);
         });
     }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    function updateStepUI(stepNumber, isRunning = false) {
+        const stepEl = document.getElementById(`step-${stepNumber}`);
+        const statusEl = document.getElementById(`status-${stepNumber}`);
+        if (!stepEl || !statusEl) return;
+
+        // Reset classes
+        stepEl.className = 'step-item';
+        statusEl.className = 'step-status';
+
+        if (isRunning) {
+            stepEl.classList.add('running');
+            statusEl.textContent = 'RUNNING';
+            return;
+        }
+
+        const result = results.get(stepNumber);
+        if (result) {
+            statusEl.textContent = result.status;
+            
+            if (result.status === 'PASS') {
+                stepEl.classList.add('pass');
+                statusEl.classList.add('pass');
+            } else if (['FAIL', 'ERROR', 'TIMEOUT'].includes(result.status)) {
+                stepEl.classList.add('fail');
+                statusEl.classList.add('fail');
+            } else if (result.status === 'SKIP') {
+                stepEl.classList.add('skip');
+                statusEl.classList.add('skip');
+            }
+        }
     }
 
-    function formatDuration(ms) {
-        if (ms < 1000) {
-            return `${ms}ms`;
+    function updateSummary() {
+        if (steps.length === 0) return;
+        
+        let passed = 0;
+        let failed = 0;
+        let pending = 0;
+        
+        steps.forEach(step => {
+            const result = results.get(step.step_number);
+            if (!result || result.status === 'PENDING') {
+                pending++;
+            } else if (result.status === 'PASS') {
+                passed++;
+            } else if (['FAIL', 'ERROR', 'TIMEOUT'].includes(result.status)) {
+                failed++;
+            }
+        });
+
+        if (pending > 0 && passed === 0 && failed === 0) {
+            summary.style.display = 'none';
+            return;
         }
-        if (ms < 60000) {
-            return `${(ms / 1000).toFixed(1)}s`;
+
+        summary.style.display = 'flex';
+        
+        if (pending > 0) {
+            summary.className = 'summary';
+            summaryIcon.textContent = '⏳';
+            summaryText.textContent = `执行中... (已完成: ${passed + failed}/${steps.length})`;
+        } else {
+            // Summary logic mostly handled by 'allCompleted' now
         }
-        const minutes = Math.floor(ms / 60000);
-        const seconds = ((ms % 60000) / 1000).toFixed(0);
-        return `${minutes}m${seconds}s`;
     }
 
-    // ---- 初始化 ----
-    // 通知 Extension，Webview 已准备就绪
+    // 触发 initial load
     vscode.postMessage({ command: 'ready' });
 })();

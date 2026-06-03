@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trae Harvester UI Preview</title>
+    <style>
+        /* Mock VS Code variables */
+        :root {
+            --vscode-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --vscode-font-size: 13px;
+            --vscode-foreground: #cccccc;
+            --vscode-sideBar-background: #1e1e1e;
+            --vscode-sideBarSectionHeader-foreground: #858585;
+            --vscode-button-background: #007acc;
+            --vscode-button-foreground: #ffffff;
+            --vscode-button-hoverBackground: #0062a3;
+            --vscode-button-secondaryBackground: #3a3d41;
+            --vscode-button-secondaryForeground: #ffffff;
+            --vscode-button-secondaryHoverBackground: #45494e;
+            --vscode-focusBorder: #007fd4;
+            --vscode-errorForeground: #f14c4c;
+            --vscode-list-hoverBackground: #2a2d2e;
+
+            /* Modern aesthetics variables */
+            --spacing-xs: 6px;
+            --spacing-sm: 10px;
+            --spacing-md: 16px;
+            --spacing-lg: 20px;
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            
+            --card-bg: #252526;
+            --card-border: rgba(255, 255, 255, 0.08);
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            --transition-speed: 0.2s;
+        }
+
+        body {
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-sideBar-background);
+            padding: var(--spacing-lg);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+        }
+
+        .sidebar-mockup {
+            width: 320px;
+            background-color: var(--vscode-sideBar-background);
+            border: 1px solid var(--card-border);
+            height: 90vh;
+            border-radius: var(--radius-sm);
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 20px 20px 60px rgba(0,0,0,0.5);
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+            padding: var(--spacing-md);
+        }
+
+        /* ---- Card Section ---- */
+        .section-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            box-shadow: var(--card-shadow);
+        }
+
+        .section-header {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--vscode-sideBarSectionHeader-foreground);
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ---- Actions Grid ---- */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-sm);
+        }
+
+        .actions-grid.full {
+            grid-template-columns: 1fr;
+        }
+
+        /* ---- Modern Buttons ---- */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            box-shadow: 0 2px 6px rgba(0, 122, 204, 0.4);
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--vscode-button-hoverBackground);
+            box-shadow: 0 4px 8px rgba(0, 122, 204, 0.6);
+        }
+
+        .btn-secondary {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: 1px solid var(--card-border);
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-danger {
+            color: var(--vscode-errorForeground);
+            background-color: rgba(241, 76, 76, 0.1);
+            border: 1px solid rgba(241, 76, 76, 0.2);
+        }
+        .btn-danger:hover:not(:disabled) {
+            background-color: rgba(241, 76, 76, 0.2);
+            border-color: rgba(241, 76, 76, 0.4);
+        }
+
+        /* ---- Panels (Submenu, Add Step, Add Check) ---- */
+        .panel-container {
+            display: none;
+            margin-top: 12px;
+            background: rgba(0,0,0,0.2);
+            padding: 12px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--card-border);
+            animation: slideDown 0.2s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel-header {
+            font-size: 11px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            color: var(--vscode-foreground);
+        }
+
+        .panel-close {
+            cursor: pointer;
+            opacity: 0.6;
+        }
+        .panel-close:hover {
+            opacity: 1;
+        }
+
+        .input-field {
+            width: 100%;
+            margin-bottom: 8px;
+            padding: 6px;
+            background: #3c3c3c;
+            border: 1px solid transparent;
+            color: white;
+            font-family: var(--vscode-font-family);
+            border-radius: 2px;
+            box-sizing: border-box;
+            outline: none;
+        }
+        .input-field:focus {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        /* ---- Loading Animation ---- */
+        .spinner {
+            display: none;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .btn.loading .spinner {
+            display: block;
+        }
+        .btn.loading .icon-normal {
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ---- Toasts ---- */
+        #toast-container {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .toast {
+            background-color: #333333;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success { border-left: 3px solid #4ec9b0; }
+        .toast.info { border-left: 3px solid #007acc; }
+        .toast.error { border-left: 3px solid #f14c4c; }
+
+    </style>
+</head>
+<body>
+
+    <div class="sidebar-mockup">
+        <!-- Toast Container (Absolute within sidebar) -->
+        <div id="toast-container"></div>
+
+        <div class="container">
+            <!-- Global Tools Card -->
+            <div class="section-card">
+                <div class="section-header">
+                    <span>🎛️ Harvester 工具箱</span>
+                </div>
+                
+                <div class="actions-grid">
+                    <button class="btn btn-secondary" onclick="simulateAction(this, 'MCP Server 已启动', 'success')">
+                        <span class="icon-normal">🔴</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">启动 MCP</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="simulateAction(this, '✅ 当前已是最新版 (v0.4.0)', 'success')">
+                        <span class="icon-normal">🔄</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">检查更新</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="simulateAction(this, '⚙️ 打开设置页', 'info')">
+                        <span class="icon-normal">⚙️</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">插件设置</span>
+                    </button>
+                    <button class="btn btn-danger" onclick="simulateAction(this, '🗑️ 所有数据已清除', 'error')">
+                        <span class="icon-normal">🗑️</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">全部清除</span>
+                    </button>
+                </div>
+                
+                <div style="margin-top: var(--spacing-sm); height: 1px; background: var(--card-border);"></div>
+                
+                <div class="actions-grid full" style="margin-top: var(--spacing-sm);">
+                    <button class="btn btn-secondary" onclick="simulateAction(this, '📦 Patch 文件导出成功！', 'success', 1500)">
+                        <span class="icon-normal">📦</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">导出 Patch</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="simulateAction(this, '📝 日志导出完成', 'info', 800)">
+                        <span class="icon-normal">📝</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">导出调试日志</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="simulateAction(this, '📊 测试报告已生成', 'success', 1000)">
+                        <span class="icon-normal">📊</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">导出测试结果</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Test Execution Card -->
+            <div class="section-card">
+                <div class="section-header">
+                    <span>📋 测试编排与执行</span>
+                </div>
+                
+                <div class="actions-grid">
+                    <button class="btn btn-secondary" onclick="openPanel('sub-menu')">
+                        <span class="icon-normal">➕</span>
+                        <span class="btn-text">添加...</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="simulateAction(this, '📑 JSON 已复制到剪贴板', 'success')">
+                        <span class="icon-normal">📑</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">复制 JSON</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="simulateAction(this, '🔄 所有状态已被重置为 PENDING', 'info', 500)">
+                        <span class="icon-normal">🔄</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">重置状态</span>
+                    </button>
+                </div>
+
+                <!-- 1. 子菜单面板 (Sub Menu) -->
+                <div id="sub-menu" class="panel-container">
+                    <div class="panel-header">选择操作 <span class="panel-close" onclick="closeAllPanels()">✖</span></div>
+                    <div class="actions-grid full" style="gap: 4px;">
+                        <button class="btn btn-secondary" style="justify-content: flex-start" onclick="simulateAction(this, '📥 从 JSON 导入成功', 'success', 500)">
+                            <span class="icon-normal">📥</span>
+                            <span class="spinner"></span>
+                            <span class="btn-text">从 JSON 导入</span>
+                        </button>
+                        <button class="btn btn-secondary" style="justify-content: flex-start" onclick="openPanel('add-step-panel')">
+                            <span class="icon-normal">📝</span>
+                            <span class="btn-text">添加测试命令</span>
+                        </button>
+                        <button class="btn btn-secondary" style="justify-content: flex-start" onclick="openPanel('add-check-panel')">
+                            <span class="icon-normal">📋</span>
+                            <span class="btn-text">添加检查项</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 2. 添加测试命令面板 -->
+                <div id="add-step-panel" class="panel-container">
+                    <div class="panel-header">添加测试命令 <span class="panel-close" onclick="closeAllPanels()">✖</span></div>
+                    <input type="text" id="step-title" class="input-field" placeholder="步骤标题">
+                    <input type="text" id="step-command" class="input-field" placeholder="执行命令 (如 npm run test)">
+                    <button class="btn btn-primary" style="width: 100%" id="btn-submit-step" onclick="submitStep()">
+                        添加指令
+                    </button>
+                </div>
+
+                <!-- 3. 添加检查项面板 -->
+                <div id="add-check-panel" class="panel-container">
+                    <div class="panel-header">添加人工检查项 <span class="panel-close" onclick="closeAllPanels()">✖</span></div>
+                    <input type="text" id="check-title" class="input-field" placeholder="检查项内容 (如 检查侧边栏颜色)">
+                    <button class="btn btn-primary" style="width: 100%" id="btn-submit-check" onclick="submitCheck()">
+                        添加检查项
+                    </button>
+                </div>
+
+                <div class="actions-grid full" style="margin-top: var(--spacing-sm);">
+                    <button class="btn btn-primary" onclick="simulateAction(this, '✅ 所有测试执行完毕', 'success', 2500)">
+                        <span class="icon-normal">▶</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">全部执行</span>
+                    </button>
+                </div>
+
+                <!-- Fake Empty State -->
+                <div style="text-align: center; margin-top: 30px; opacity: 0.5;">
+                    <div style="font-size: 24px; margin-bottom: 8px;">📭</div>
+                    <div>暂无测试步骤</div>
+                    <div style="font-size: 11px; margin-top: 4px;">点上方添加或 MCP 导入</div>
+                </div>
+            </div>
+
+            <!-- AI Context Card -->
+            <div class="section-card">
+                <div class="section-header">
+                    <span>🧠 AI 思考上下文 (Evidence)</span>
+                </div>
+                <textarea class="input-field" id="ai-context" rows="4" placeholder="将 AI 生成的思考过程或代码分析粘贴在这里..." style="resize: vertical;"></textarea>
+                <div class="actions-grid full" style="margin-top: 4px;">
+                    <button class="btn btn-primary" onclick="simulateAction(this, '✅ AI 思考上下文已保存', 'success', 500)">
+                        <span class="icon-normal">💾</span>
+                        <span class="spinner"></span>
+                        <span class="btn-text">保存上下文</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 面板控制逻辑 ---
+        const panels = ['sub-menu', 'add-step-panel', 'add-check-panel'];
+
+        function closeAllPanels() {
+            panels.forEach(id => {
+                document.getElementById(id).style.display = 'none';
+            });
+        }
+
+        function openPanel(panelId) {
+            closeAllPanels();
+            const panel = document.getElementById(panelId);
+            panel.style.display = 'block';
+            
+            // 自动聚焦第一个输入框
+            const firstInput = panel.querySelector('input');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }
+
+        // --- 回车提交逻辑 ---
+        document.getElementById('step-title').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('step-command').focus();
+        });
+        document.getElementById('step-command').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitStep();
+        });
+        document.getElementById('check-title').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submitCheck();
+        });
+
+        // --- 提交动作 ---
+        function submitStep() {
+            const titleInput = document.getElementById('step-title');
+            const cmdInput = document.getElementById('step-command');
+            if (!titleInput.value.trim() || !cmdInput.value.trim()) return;
+
+            showToast(`✅ 成功添加指令: ${titleInput.value}`, 'success');
+            titleInput.value = '';
+            cmdInput.value = '';
+            closeAllPanels();
+        }
+
+        function submitCheck() {
+            const checkInput = document.getElementById('check-title');
+            if (!checkInput.value.trim()) return;
+
+            showToast(`✅ 成功添加检查项: ${checkInput.value}`, 'success');
+            checkInput.value = '';
+            closeAllPanels();
+        }
+
+        // --- 模拟主进程耗时操作的响应机制 ---
+        function simulateAction(btnElement, toastMsg, toastType, delayMs = 1000) {
+            closeAllPanels();
+            // 1. 设置按钮 Loading 态
+            const originalText = btnElement.querySelector('.btn-text').innerText;
+            btnElement.classList.add('loading');
+            btnElement.disabled = true;
+            btnElement.querySelector('.btn-text').innerText = '执行中...';
+
+            // 2. 模拟耗时网络/IO请求
+            setTimeout(() => {
+                // 3. 恢复按钮状态
+                btnElement.classList.remove('loading');
+                btnElement.disabled = false;
+                btnElement.querySelector('.btn-text').innerText = originalText;
+
+                // 4. 弹出反馈 Toast
+                showToast(toastMsg, toastType);
+            }, delayMs);
+        }
+
+        // --- 优雅的内置 Toast 提示系统 ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // Icon matching
+            let icon = 'ℹ️';
+            if (type === 'success') icon = '✅';
+            if (type === 'error') icon = '❌';
+
+            toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            // 触发回流以激活动画
+            void toast.offsetWidth; 
+            toast.classList.add('show');
+
+            // 3秒后自动消失
+            setTimeout(() => {
+                toast.classList.remove('show');
+                // 等待退出动画结束
+                setTimeout(() => {
+                    if (container.contains(toast)) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
