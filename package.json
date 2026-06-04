@@ -61,6 +61,11 @@
         "command": "trae-harvester.copyRouterCommand",
         "title": "Copy MCP Router Command (复制统一路由命令)",
         "category": "Trae Harvester"
+      },
+      {
+        "command": "trae-harvester.showGlobalStatus",
+        "title": "Show Global Status Dashboard (全局多窗口状态大屏)",
+        "category": "Trae Harvester"
       }
     ],
     "viewsContainers": {

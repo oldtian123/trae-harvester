@@ -119,6 +119,22 @@ export function activate(context: vscode.ExtensionContext) {
             const command = `node "${routerPath}"`;
             vscode.env.clipboard.writeText(command);
             vscode.window.showInformationMessage('✅ MCP Router 启动命令已复制到剪贴板！请在 Codex 或 Cline 的 MCP 设置中将其配置为 command。');
+        }),
+        
+        vscode.commands.registerCommand('trae-harvester.showGlobalStatus', () => {
+            const dashboardPath = path.join(context.extensionPath, 'out', 'status-dashboard.js');
+            const command = `node "${dashboardPath}"`;
+            
+            const terminalName = 'Harvester Global Status';
+            let terminal = vscode.window.terminals.find(t => t.name === terminalName);
+            
+            if (terminal) {
+                terminal.dispose(); // 重启以刷新控制台
+            }
+            
+            terminal = vscode.window.createTerminal(terminalName);
+            terminal.show();
+            terminal.sendText(command);
         })
     );
 

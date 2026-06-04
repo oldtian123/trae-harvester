@@ -131,6 +131,9 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
                     case 'checkUpdates':
                         await vscode.commands.executeCommand('trae-harvester.checkForUpdates');
                         break;
+                    case 'showGlobalStatus':
+                        await vscode.commands.executeCommand('trae-harvester.showGlobalStatus');
+                        break;
                     case 'updateIdentifiers':
                         const { updatePlanIdentifiers } = require('../commands/testRunner');
                         updatePlanIdentifiers(message.modelId, message.promptId);
@@ -245,6 +248,11 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
                     <span class="spinner"></span>
                     <span class="btn-text">启动 MCP</span>
                 </button>
+                <button id="btn-show-global-status" class="btn btn-secondary" title="在终端中打开全局多窗口状态大屏">
+                    <span class="icon-normal">📊</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">状态大屏</span>
+                </button>
                 <button id="btn-check-updates" class="btn btn-secondary" title="检查并安装最新版本">
                     <span class="icon-normal">🔄</span>
                     <span class="spinner"></span>
@@ -255,7 +263,7 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
                     <span class="spinner"></span>
                     <span class="btn-text">插件设置</span>
                 </button>
-                <button id="btn-clear-all" class="btn btn-danger" title="一键清除当前测试计划、结果和上下文">
+                <button id="btn-clear-all" class="btn btn-danger" title="一键清除当前测试计划、结果和上下文" style="grid-column: 1 / -1;">
                     <span class="icon-normal">🗑️</span>
                     <span class="spinner"></span>
                     <span class="btn-text">全部清除</span>

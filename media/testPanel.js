@@ -21,6 +21,7 @@
     
     // Tools
     const btnToggleMcp = document.getElementById('btn-toggle-mcp');
+    const btnShowGlobalStatus = document.getElementById('btn-show-global-status');
     const btnCheckUpdates = document.getElementById('btn-check-updates');
     const btnOpenSettings = document.getElementById('btn-open-settings');
     const btnClearAll = document.getElementById('btn-clear-all');
@@ -155,6 +156,12 @@
         btnToggleMcp.addEventListener('click', () => {
             // MCP 的状态是自动推给前端的，这里不需要假 loading
             vscode.postMessage({ command: 'toggleMcp' });
+        });
+    }
+
+    if (btnShowGlobalStatus) {
+        btnShowGlobalStatus.addEventListener('click', () => {
+            vscode.postMessage({ command: 'showGlobalStatus' });
         });
     }
 
