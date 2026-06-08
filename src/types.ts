@@ -69,6 +69,8 @@ export interface RegistryEntry {
     model_id?: string;
     prompt_id?: string;
     last_heartbeat: number;
+    /** 随机生成的鉴权令牌，每个实例唯一 */
+    auth_token?: string;
 }
 
 // ---- 功能三：AI 上下文 ----

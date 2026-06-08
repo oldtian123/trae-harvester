@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
+// ============================================================
+// Trae Harvester — 全局多窗口状态大屏 (Global Status Dashboard)
+// ============================================================
+// 扫描 ~/.trae-harvester-registry/ 目录，每 2 秒刷新一次。
+
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const REGISTRY_FILE = path.join(os.homedir(), '.trae-harvester-registry.json');
+const REGISTRY_DIR = path.join(os.homedir(), '.trae-harvester-registry');
 
 // Helper to pad strings for tabular display
 function padRight(str, len) {
@@ -24,42 +29,63 @@ function getStringWidth(str) {
     return width;
 }
 
-function printDashboard() {
-    let registry = {};
+function getRegistry() {
+    const result = {};
     try {
-        if (fs.existsSync(REGISTRY_FILE)) {
-            const data = fs.readFileSync(REGISTRY_FILE, 'utf-8');
-            registry = JSON.parse(data);
+        if (!fs.existsSync(REGISTRY_DIR)) {
+            return result;
+        }
+        const files = fs.readdirSync(REGISTRY_DIR).filter(f => f.endsWith('.json'));
+        const now = Date.now();
+
+        for (const file of files) {
+            const filePath = path.join(REGISTRY_DIR, file);
+            try {
+                const data = fs.readFileSync(filePath, 'utf-8');
+                const entry = JSON.parse(data);
+
+                // 心跳超过 120 秒认为已死
+                if (now - entry.last_heartbeat > 120000) {
+                    continue;
+                }
+
+                const port = path.basename(file, '.json');
+                result[port] = entry;
+            } catch (e) {
+                // ignore
+            }
         }
     } catch (e) {
-        // Ignore JSON parse errors while updating
+        // ignore
     }
+    return result;
+}
 
+function printDashboard() {
+    const registry = getRegistry();
     const now = Date.now();
     const activeSessions = [];
 
     for (const port in registry) {
         const entry = registry[port];
-        // Clean up dead entries (no heartbeat for 120s)
-        if (now - entry.last_heartbeat < 120000) {
-            activeSessions.push({
-                port: port,
-                pid: entry.pid,
-                status: entry.status || 'IDLE',
-                model: entry.model_id || '-',
-                prompt: entry.prompt_id || '-',
-                workspace: entry.workspace
-            });
-        }
+        activeSessions.push({
+            port: port,
+            pid: entry.pid,
+            status: entry.status || 'IDLE',
+            model: entry.model_id || '-',
+            prompt: entry.prompt_id || '-',
+            workspace: entry.workspace,
+            auth: entry.auth_token ? '🔒' : '⚠️'
+        });
     }
 
     // Clear console (ANSI escape codes)
     process.stdout.write('\x1Bc');
 
-    console.log("==========================================================================================");
-    console.log("                           🚜 Trae Harvester Global Dashboard                             ");
-    console.log("==========================================================================================");
-    console.log(`Current Time: ${new Date().toLocaleTimeString()} | Active Windows: ${activeSessions.length}\n`);
+    console.log("====================================================================================================");
+    console.log("                           🚜 Trae Harvester Global Dashboard v2.0                                 ");
+    console.log("====================================================================================================");
+    console.log(`Current Time: ${new Date().toLocaleTimeString()} | Active Windows: ${activeSessions.length} | Registry: Directory Mode\n`);
 
     if (activeSessions.length === 0) {
         console.log("  No active Trae Harvester windows found.");
@@ -69,6 +95,7 @@ function printDashboard() {
             padRight("PORT", 6),
             padRight("PID", 8),
             padRight("STATUS", 12),
+            padRight("AUTH", 5),
             padRight("MODEL", 18),
             padRight("PROMPT", 18),
             padRight("WORKSPACE", 30)
@@ -87,6 +114,7 @@ function printDashboard() {
                 padRight(s.port, 6),
                 padRight(s.pid, 8),
                 `${statusColor}${padRight(s.status, 12)}${resetColor}`,
+                padRight(s.auth, 5),
                 padRight(s.model, 18),
                 padRight(s.prompt, 18),
                 workspaceBase.length > 30 ? workspaceBase.substring(0, 27) + "..." : padRight(workspaceBase, 30)
@@ -96,7 +124,7 @@ function printDashboard() {
         });
     }
     
-    console.log("\n==========================================================================================");
+    console.log("\n====================================================================================================");
     console.log("  Press Ctrl+C to exit. Refreshing every 2 seconds...");
 }
 

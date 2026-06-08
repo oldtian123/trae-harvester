@@ -49,6 +49,8 @@ const logger_1 = require("../utils/logger");
 const registry_1 = require("../utils/registry");
 const testRunner_1 = require("../commands/testRunner");
 let serverInstance = null;
+/** 当前实例的鉴权令牌 */
+let currentAuthToken = null;
 // ==========================================
 // Stateless HTTP Transport (For Codex direct POST)
 // ==========================================
@@ -169,6 +171,14 @@ function createConfiguredMcpServer() {
     mcpServer.tool('trea_harvester_import_test_plan', 'Use this trea_harvester tool to import a complete JSON string representing the test plan (steps and check_items) and wait for the human to execute it.', {
         jsonText: zod_1.z.string().describe('The JSON string matching the TestPlan format (e.g. {"steps": [...], "check_items": [...]})')
     }, async ({ jsonText }) => {
+        // 高危工具权限检查
+        const allowExecution = vscode.workspace.getConfiguration('traeHarvester').get('mcpAllowExecution', true);
+        if (!allowExecution) {
+            return {
+                content: [{ type: 'text', text: '⛔ Permission denied: MCP execution mode is disabled (traeHarvester.mcpAllowExecution = false). This tool is read-only.' }],
+                isError: true
+            };
+        }
         const { importTestPlanJson } = require('../commands/testRunner');
         try {
             importTestPlanJson(jsonText);
@@ -246,6 +256,14 @@ function createConfiguredMcpServer() {
         };
     });
     mcpServer.tool('trea_harvester_run_all_tests', 'Use this trea_harvester tool to execute all tests defined in the test plan in the terminal.', {}, async () => {
+        // 高危工具权限检查
+        const allowExecution = vscode.workspace.getConfiguration('traeHarvester').get('mcpAllowExecution', true);
+        if (!allowExecution) {
+            return {
+                content: [{ type: 'text', text: '⛔ Permission denied: MCP execution mode is disabled (traeHarvester.mcpAllowExecution = false). This tool is read-only.' }],
+                isError: true
+            };
+        }
         vscode.commands.executeCommand('trae-harvester.runAllTests');
         return {
             content: [{ type: 'text', text: 'Started running all tests.' }]
@@ -271,7 +289,24 @@ async function startMcpServer() {
     await globalMcpServer.connect(globalStatelessTransport);
     const app = (0, express_1.default)();
     // ==========================================
-    // 3. 路由挂载 (兼容 SSE 和 纯 HTTP POST)
+    // 3. Bearer Token 鉴权中间件
+    // ==========================================
+    app.use('/mcp', (req, res, next) => {
+        const authHeader = req.headers['authorization'];
+        if (!currentAuthToken) {
+            // Token 还没生成（理论上不该到这里），放行
+            next();
+            return;
+        }
+        if (authHeader && authHeader === `Bearer ${currentAuthToken}`) {
+            next();
+            return;
+        }
+        log.info('MCP', `🚫 Unauthorized request blocked from ${req.ip}`);
+        res.status(401).json({ error: 'Unauthorized. Missing or invalid Bearer token.' });
+    });
+    // ==========================================
+    // 4. 路由挂载 (兼容 SSE 和 纯 HTTP POST)
     // ==========================================
     app.get('/mcp', async (req, res) => {
         log.info('MCP', 'New SSE connection established');
@@ -314,10 +349,13 @@ async function startMcpServer() {
             log.error('MCP', 'Could not find an available port for MCP Server.');
             return;
         }
-        serverInstance = app.listen(port, () => {
-            log.info('MCP', `MCP Server listening on http://localhost:${port}/mcp`);
+        // ⚡ 强制绑定 127.0.0.1，杜绝局域网/公网访问
+        serverInstance = app.listen(port, '127.0.0.1', () => {
+            log.info('MCP', `MCP Server listening on http://127.0.0.1:${port}/mcp`);
             const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || process.cwd();
-            (0, registry_1.registerInstance)(port, workspacePath);
+            // registerInstance 现在返回生成的 auth_token
+            currentAuthToken = (0, registry_1.registerInstance)(port, workspacePath);
+            log.info('MCP', `Auth token generated: ${currentAuthToken.substring(0, 8)}...`);
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
                 log.info('MCP', `Port ${port} in use, trying ${port + 1}...`);
@@ -335,6 +373,7 @@ function stopMcpServer() {
     if (serverInstance) {
         serverInstance.close();
         serverInstance = null;
+        currentAuthToken = null;
         (0, registry_1.unregisterInstance)();
         globalStatelessTransport = null;
         activeSseTransports.clear();

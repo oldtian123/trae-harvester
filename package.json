@@ -125,6 +125,11 @@
           "default": ["Prompt_V1", "Prompt_V2_Refactored"],
           "description": "测试面板中可选的提示词版本标识列表"
         },
+        "traeHarvester.mcpAllowExecution": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否允许通过 MCP 协议执行自动化测试或导入测试计划（关闭后 MCP 变为只读模式，提高安全性）"
+        },
         "traeHarvester.githubToken": {
           "type": "string",
           "default": "",
