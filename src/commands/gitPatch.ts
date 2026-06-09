@@ -16,6 +16,44 @@ export function getStoredGitPatchContent(): string {
     return currentGitPatchContent;
 }
 
+/**
+ * 获取当前分支名称
+ */
+export async function getCurrentBranch(): Promise<string> {
+    try {
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!cwd) return 'unknown';
+
+        const result = await execCommand('git rev-parse --abbrev-ref HEAD', { cwd });
+        return result.stdout.trim() || 'unknown';
+    } catch {
+        return 'unknown';
+    }
+}
+
+/**
+ * 执行 git fetch 从远端拉取最新分支信息
+ */
+export async function gitFetch(): Promise<void> {
+    const log = getLogger();
+    try {
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!cwd) {
+            vscode.window.showErrorMessage('❌ 未打开工作区');
+            return;
+        }
+
+        log.info('GitFetch', 'Executing git fetch...');
+        await execCommand('git fetch --all', { cwd, timeout: 30000 });
+
+        vscode.window.showInformationMessage('✅ Git Fetch 完成');
+        log.info('GitFetch', 'Git fetch completed successfully');
+    } catch (err: any) {
+        log.error('GitFetch', 'Git fetch failed', err);
+        vscode.window.showErrorMessage(`❌ Git Fetch 失败: ${err?.message || err}`);
+    }
+}
+
 /** Git 操作的每步日志 */
 interface GitStepLog {
     step: string;

@@ -114,7 +114,12 @@
           "items": {
             "type": "string"
           },
-          "default": ["GPT-4o", "Claude-3.5-Sonnet", "DeepSeek-V2", "Codex"],
+          "default": [
+            "GPT-4o",
+            "Claude-3.5-Sonnet",
+            "DeepSeek-V2",
+            "Codex"
+          ],
           "description": "测试面板中可选的大模型标识列表"
         },
         "traeHarvester.promptOptions": {
@@ -122,8 +127,30 @@
           "items": {
             "type": "string"
           },
-          "default": ["Prompt_V1", "Prompt_V2_Refactored"],
-          "description": "测试面板中可选的提示词版本标识列表"
+          "default": [
+            "Prompt_V1",
+            "Prompt_V2",
+            "Prompt_V3",
+            "Prompt_V4",
+            "Prompt_V5",
+            "Prompt_V6",
+            "Prompt_V7"
+          ],
+          "description": "测试面板中可选的提示词版本标识列表（最多7条）"
+        },
+        "traeHarvester.repoOptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "Repo_1",
+            "Repo_2",
+            "Repo_3",
+            "Repo_4",
+            "Repo_5"
+          ],
+          "description": "测试面板中可选的仓库编号列表"
         },
         "traeHarvester.mcpAllowExecution": {
           "type": "boolean",
@@ -147,10 +174,12 @@
     "@types/express": "^5.0.6",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.3.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "ws": "^8.21.0"
   }
 }

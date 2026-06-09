@@ -13,7 +13,8 @@ export interface CheckItem {
 export interface TestPlan {
     steps: TestStep[];
     check_items?: CheckItem[];
-    /** 评估相关的模型和Prompt标识 */
+    /** 评估相关的标识 */
+    repo_id?: string;
     model_id?: string;
     prompt_id?: string;
 }
@@ -52,50 +53,17 @@ export interface TestResult {
     steps: StepResult[];
     check_items?: CheckItem[];
     ai_context?: string;
-    /** 评估相关的模型和Prompt标识 */
+    /** 评估相关的标识 */
+    repo_id?: string;
     model_id?: string;
     prompt_id?: string;
 }
 
-// ---- 功能四：多窗口聚合路由与注册表 ----
+// ---- 多窗口会话状态 ----
+// 注：窗口注册表已由文件目录迁移到统一 Hub（见 src/hub/protocol.ts 的 WindowSession）。
+// 这里仅保留被测试引擎复用的会话状态枚举。
 
 export type SessionStatus = 'IDLE' | 'RUNNING' | 'COMPLETED';
-
-export interface RegistryEntry {
-    port: number;
-    pid: number;
-    workspace: string;
-    status: SessionStatus;
-    model_id?: string;
-    prompt_id?: string;
-    last_heartbeat: number;
-    /** 随机生成的鉴权令牌，每个实例唯一 */
-    auth_token?: string;
-}
-
-// ---- 功能三：AI 上下文 ----
-
-/** AI 对话消息 */
-export interface AgentMessage {
-    role: 'user' | 'assistant' | 'system';
-    content: string;
-    thought_chain?: string;
-}
-
-/** AI 对话 Session */
-export interface AgentSession {
-    session_id: string;
-    timestamp?: string;
-    messages: AgentMessage[];
-}
-
-/** AI 上下文导出 JSON */
-export interface AgentContextExport {
-    timestamp: string;
-    source_db: string;
-    extraction_note: string;
-    sessions: AgentSession[];
-}
 
 // ---- 子进程执行结果 ----
 

@@ -11,7 +11,7 @@ import { runShellCommand } from '../utils/shell';
 import { writeJson } from '../utils/fileUtils';
 import { TestPlan, TestStep, StepResult, TestResult, SessionStatus } from '../types';
 import { getLogger } from '../utils/logger';
-import { updateInstanceStatus } from '../utils/registry';
+import { pushSessionUpdate } from '../hub/windowServer';
 import { exportGitPatch } from './gitPatch';
 
 /** 当前加载的测试计划（模块级状态） */
@@ -20,7 +20,7 @@ let currentPlan: TestPlan | null = null;
 let stepResults: Map<number, StepResult> = new Map();
 /** 侧边栏 Webview 引用（由 Provider 设置） */
 let webviewRef: vscode.Webview | null = null;
-/** 当前 AI 上下文 */
+/** AI 生成的上下文（供 MCP 读取用于评分） */
 let currentAiContext: string = '';
 
 /**
@@ -56,14 +56,15 @@ function getResultFileName(): string {
 /**
  * 更新测试计划的模型和Prompt标识
  */
-export function updatePlanIdentifiers(modelId: string, promptId: string): void {
+export function updatePlanIdentifiers(repoId?: string, branch?: string, modelId?: string, promptId?: string): void {
     if (!currentPlan) {
-        currentPlan = { steps: [], check_items: [], model_id: modelId, prompt_id: promptId };
+        currentPlan = { steps: [], check_items: [], repo_id: repoId, model_id: modelId, prompt_id: promptId };
     } else {
-        currentPlan.model_id = modelId;
-        currentPlan.prompt_id = promptId;
+        if (repoId !== undefined) currentPlan.repo_id = repoId;
+        if (modelId !== undefined) currentPlan.model_id = modelId;
+        if (promptId !== undefined) currentPlan.prompt_id = promptId;
     }
-    
+
     // Check current overall status based on stepResults
     let status: SessionStatus = 'IDLE';
     if (currentPlan.steps.length > 0) {
@@ -81,9 +82,9 @@ export function updatePlanIdentifiers(modelId: string, promptId: string): void {
             status = 'RUNNING';
         }
     }
-    
-    updateInstanceStatus(status, modelId, promptId);
-    
+
+    pushSessionUpdate({ status, model_id: modelId, prompt_id: promptId });
+
     // Automatically snapshot history if completed
     if (status === 'COMPLETED') {
         saveHistorySnapshot();
@@ -155,11 +156,17 @@ async function saveHistorySnapshot() {
 // 暴露的方法供 Webview 侧调用或刷新
 // ==========================================
 
+/**
+ * 获取 AI Context（供 MCP 调用）
+ */
 export function getAiContext(): string {
     return currentAiContext;
 }
 
-export function setAiContext(text: string) {
+/**
+ * 设置 AI Context（供前端面板调用）
+ */
+export function setAiContext(text: string): void {
     currentAiContext = text;
 }
 
@@ -172,9 +179,7 @@ export function syncPlanToWebview(): void {
     webviewRef.postMessage({
         command: 'loadSteps',
         steps: currentPlan?.steps || [],
-        checkItems: currentPlan?.check_items || [],
-        isMcpRunning: isMcpServerRunning(),
-        aiContext: currentAiContext
+        checkItems: currentPlan?.check_items || []
     });
 }
 
@@ -369,8 +374,7 @@ function buildTestResult(results: StepResult[], totalSteps: number): TestResult 
         failed_steps: failedSteps,
         skipped_steps: skippedSteps,
         steps: results,
-        check_items: currentPlan?.check_items,
-        ai_context: currentAiContext || undefined,
+        check_items: currentPlan?.check_items
     };
 }
 
@@ -481,7 +485,7 @@ async function runAllSteps(outputDir: string): Promise<void> {
     });
     
     // Update registry status to COMPLETED
-    updateInstanceStatus('COMPLETED', currentPlan.model_id, currentPlan.prompt_id);
+    pushSessionUpdate({ status: 'COMPLETED', model_id: currentPlan.model_id, prompt_id: currentPlan.prompt_id });
     saveHistorySnapshot();
 
     const icon = testResult.final_status === 'PASS' ? '✅' : testResult.final_status === 'PARTIAL' ? '⚠️' : '❌';
@@ -592,7 +596,7 @@ export async function resetStepResults(): Promise<void> {
     stepResults.clear();
     
     // Update registry status to RUNNING
-    updateInstanceStatus('RUNNING', currentPlan.model_id, currentPlan.prompt_id);
+    pushSessionUpdate({ status: 'RUNNING', model_id: currentPlan.model_id, prompt_id: currentPlan.prompt_id });
 
     // 生成 PENDING 状态的新 test_result.json
     const config = vscode.workspace.getConfiguration('traeHarvester');

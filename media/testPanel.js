@@ -52,16 +52,18 @@
     const btnAddStep = document.getElementById('btn-add-step');
     const inputCheckItem = document.getElementById('input-check-item');
     const btnAddCheck = document.getElementById('btn-add-check');
-    
+
     // AI Context
     const inputAiContext = document.getElementById('input-ai-context');
     const btnSaveAiContext = document.getElementById('btn-save-ai-context');
-    
+
     // Check Items
     const checkItemsSection = document.getElementById('check-items-section');
     const checkItemsList = document.getElementById('check-items-list');
 
     // Identifiers
+    const selectRepo = document.getElementById('select-repo');
+    const inputBranch = document.getElementById('input-branch');
     const selectModel = document.getElementById('select-model');
     const selectPrompt = document.getElementById('select-prompt');
 
@@ -152,6 +154,13 @@
     }
 
     // ---- 绑定按钮动作 ----
+    const btnGitFetch = document.getElementById('btn-git-fetch');
+    if (btnGitFetch) {
+        btnGitFetch.addEventListener('click', () => {
+            simulateActionWithToast(btnGitFetch, 'gitFetch', 'Git Fetch 执行中...', 'info', 2000);
+        });
+    }
+
     if (btnToggleMcp) {
         btnToggleMcp.addEventListener('click', () => {
             // MCP 的状态是自动推给前端的，这里不需要假 loading
@@ -223,7 +232,11 @@
     if (btnSaveAiContext) {
         btnSaveAiContext.addEventListener('click', () => {
             const text = inputAiContext.value.trim();
-            simulateActionWithToast(btnSaveAiContext, null, 'AI 思考上下文已保存', 'success', 500);
+            if (!text) {
+                showToast('请输入 AI 上下文内容', 'error');
+                return;
+            }
+            simulateActionWithToast(btnSaveAiContext, null, 'AI 上下文已保存', 'success', 500);
             vscode.postMessage({ command: 'saveAiContext', text });
         });
     }
@@ -272,14 +285,19 @@
 
     // ---- 标识符变更通知 ----
     function notifyIdentifiersChange() {
-        if (!selectModel || !selectPrompt) return;
+        if (!selectRepo || !selectModel || !selectPrompt) return;
         vscode.postMessage({
             command: 'updateIdentifiers',
+            repoId: selectRepo.value,
+            branch: inputBranch ? inputBranch.value : '',
             modelId: selectModel.value,
             promptId: selectPrompt.value
         });
     }
 
+    if (selectRepo) {
+        selectRepo.addEventListener('change', notifyIdentifiersChange);
+    }
     if (selectModel) {
         selectModel.addEventListener('change', notifyIdentifiersChange);
     }
@@ -293,8 +311,29 @@
         switch (message.command) {
             case 'loadSteps':
                 steps = message.steps || [];
-                
-                // Render Identifiers Options
+
+                // Render Repo Options
+                if (selectRepo && message.repoOptions) {
+                    selectRepo.innerHTML = '';
+                    message.repoOptions.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.textContent = opt;
+                        selectRepo.appendChild(option);
+                    });
+                    if (message.repoId) {
+                        selectRepo.value = message.repoId;
+                    } else if (message.repoOptions.length > 0) {
+                        selectRepo.value = message.repoOptions[0];
+                    }
+                }
+
+                // Set Branch (readonly)
+                if (inputBranch) {
+                    inputBranch.value = message.branch || 'unknown';
+                }
+
+                // Render Model Options
                 if (selectModel && message.modelOptions) {
                     selectModel.innerHTML = '';
                     message.modelOptions.forEach(opt => {
