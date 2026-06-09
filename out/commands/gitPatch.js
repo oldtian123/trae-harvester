@@ -39,6 +39,8 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getStoredGitPatchContent = getStoredGitPatchContent;
+exports.getCurrentBranch = getCurrentBranch;
+exports.gitFetch = gitFetch;
 exports.exportGitPatch = exportGitPatch;
 exports.registerExportPatchCommand = registerExportPatchCommand;
 const vscode = __importStar(require("vscode"));
@@ -49,6 +51,42 @@ const logger_1 = require("../utils/logger");
 let currentGitPatchContent = '';
 function getStoredGitPatchContent() {
     return currentGitPatchContent;
+}
+/**
+ * 获取当前分支名称
+ */
+async function getCurrentBranch() {
+    try {
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!cwd)
+            return 'unknown';
+        const result = await (0, shell_1.execCommand)('git rev-parse --abbrev-ref HEAD', { cwd });
+        return result.stdout.trim() || 'unknown';
+    }
+    catch {
+        return 'unknown';
+    }
+}
+/**
+ * 执行 git fetch 从远端拉取最新分支信息
+ */
+async function gitFetch() {
+    const log = (0, logger_1.getLogger)();
+    try {
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!cwd) {
+            vscode.window.showErrorMessage('❌ 未打开工作区');
+            return;
+        }
+        log.info('GitFetch', 'Executing git fetch...');
+        await (0, shell_1.execCommand)('git fetch --all', { cwd, timeout: 30000 });
+        vscode.window.showInformationMessage('✅ Git Fetch 完成');
+        log.info('GitFetch', 'Git fetch completed successfully');
+    }
+    catch (err) {
+        log.error('GitFetch', 'Git fetch failed', err);
+        vscode.window.showErrorMessage(`❌ Git Fetch 失败: ${err?.message || err}`);
+    }
 }
 /**
  * 执行 Git Patch 导出的完整流程。

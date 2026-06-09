@@ -45,7 +45,7 @@ const testRunner_1 = require("./commands/testRunner");
 const diagnostics_1 = require("./commands/diagnostics");
 const testPanelProvider_1 = require("./providers/testPanelProvider");
 const logger_1 = require("./utils/logger");
-const mcpServer_1 = require("./mcp/mcpServer");
+const windowServer_1 = require("./hub/windowServer");
 const autoUpdater_1 = require("./utils/autoUpdater");
 const path = __importStar(require("path"));
 /**
@@ -67,6 +67,13 @@ function activate(context) {
     const patchCmd = (0, gitPatch_1.registerExportPatchCommand)(context);
     context.subscriptions.push(patchCmd);
     log.debug('Extension', '已注册命令: trae-harvester.exportPatch');
+    // ---- Git Fetch 命令 ----
+    const gitFetchCmd = vscode.commands.registerCommand('trae-harvester.gitFetch', async () => {
+        const { gitFetch } = require('./commands/gitPatch');
+        await gitFetch();
+    });
+    context.subscriptions.push(gitFetchCmd);
+    log.debug('Extension', '已注册命令: trae-harvester.gitFetch');
     // ---- 注册功能二：测试命令编排 ----
     const testCmds = (0, testRunner_1.registerTestCommands)(context);
     testCmds.forEach(cmd => context.subscriptions.push(cmd));
@@ -75,12 +82,12 @@ function activate(context) {
     log.debug('Extension', '已注册命令: trae-harvester.runSingleStep');
     // AI Context feature has been removed as per user request.
     // ---- 注册侧边栏 Webview Provider ----
-    const testPanelProvider = new testPanelProvider_1.TestPanelProvider(context.extensionUri);
+    const testPanelProvider = new testPanelProvider_1.TestPanelProvider(context.extensionUri, context);
     const panelRegistration = vscode.window.registerWebviewViewProvider(testPanelProvider_1.TestPanelProvider.viewType, testPanelProvider);
     context.subscriptions.push(panelRegistration);
     log.debug('Extension', '已注册侧边栏: trae-harvester.testPanel');
-    // ---- 启动 MCP Server ----
-    (0, mcpServer_1.startMcpServer)();
+    // ---- 窗口 HTTP server 改为手动控制（通过侧边栏按钮） ----
+    // 不再自动启动
     // ---- 注册一键执行所有功能的快捷命令（可选） ----
     const harvestAllCmd = vscode.commands.registerCommand('trae-harvester.harvestAll', async () => {
         try {
@@ -109,7 +116,7 @@ function activate(context) {
                 progress.report({ message: '完成!', increment: 100 });
             });
             const config = vscode.workspace.getConfiguration('traeHarvester');
-            const outputPath = config.get('outputPath', '/gitdiff_shared');
+            const outputPath = config.get('patchOutputPath', '/gitdiff_shared');
             vscode.window.showInformationMessage(`🎉 收割完成! 产物目录: ${outputPath}`);
         }
         catch (err) {
@@ -125,13 +132,38 @@ function activate(context) {
     log.debug('Extension', '已注册命令: trae-harvester.showLogs');
     context.subscriptions.push(vscode.commands.registerCommand('trae-harvester.checkForUpdates', () => {
         (0, autoUpdater_1.checkForUpdates)(context, true);
-    }), vscode.commands.registerCommand('trae-harvester.copyRouterCommand', () => {
-        const routerPath = path.join(context.extensionPath, 'out', 'mcp-router.js');
-        const command = `node "${routerPath}"`;
-        vscode.env.clipboard.writeText(command);
-        vscode.window.showInformationMessage('✅ MCP Router 启动命令已复制到剪贴板！请在 Codex 或 Cline 的 MCP 设置中将其配置为 command。');
+    }), vscode.commands.registerCommand('trae-harvester.copyRouterCommand', async () => {
+        const bridgePath = path.join(context.extensionPath, 'out', 'hub', 'bridge.js');
+        const stdioCommand = `node "${bridgePath}"`;
+        // 读取 Hub 信息以提供 HTTP 端点
+        const hubInfoPath = require('os').homedir() + '/.trae-harvester-hub.json';
+        let httpEndpoint = 'Hub not running';
+        let token = '';
+        if (require('fs').existsSync(hubInfoPath)) {
+            try {
+                const hubInfo = JSON.parse(require('fs').readFileSync(hubInfoPath, 'utf-8'));
+                httpEndpoint = `http://127.0.0.1:${hubInfo.port}/mcp`;
+                token = hubInfo.token;
+            }
+            catch { }
+        }
+        const choice = await vscode.window.showQuickPick([
+            { label: '$(terminal) Stdio Bridge (推荐)', description: '大模型运行 node 命令', value: 'stdio' },
+            { label: '$(globe) HTTP Endpoint', description: '大模型直连 URL + Bearer', value: 'http' },
+        ], { placeHolder: '选择大模型接入 Hub 的方式' });
+        if (!choice)
+            return;
+        if (choice.value === 'stdio') {
+            await vscode.env.clipboard.writeText(stdioCommand);
+            vscode.window.showInformationMessage('✅ Stdio Bridge 命令已复制！粘贴到大模型 MCP command 配置。');
+        }
+        else {
+            const httpConfig = `端点: ${httpEndpoint}\nAuthorization: Bearer ${token}`;
+            await vscode.env.clipboard.writeText(httpConfig);
+            vscode.window.showInformationMessage('✅ HTTP 端点与 token 已复制！配置到大模型 MCP 设置。');
+        }
     }), vscode.commands.registerCommand('trae-harvester.showGlobalStatus', () => {
-        const dashboardPath = path.join(context.extensionPath, 'out', 'status-dashboard.js');
+        const dashboardPath = path.join(context.extensionPath, 'out', 'hub', 'dashboard.js');
         const command = `node "${dashboardPath}"`;
         const terminalName = 'Harvester Global Status';
         let terminal = vscode.window.terminals.find(t => t.name === terminalName);
@@ -156,7 +188,7 @@ function activate(context) {
  */
 function deactivate() {
     try {
-        (0, mcpServer_1.stopMcpServer)();
+        (0, windowServer_1.stopWindowServer)();
         (0, logger_1.getLogger)().info('Extension', '扩展已停用');
     }
     catch {

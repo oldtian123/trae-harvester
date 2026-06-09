@@ -63,7 +63,7 @@ const os = __importStar(require("os"));
 const shell_1 = require("../utils/shell");
 const fileUtils_1 = require("../utils/fileUtils");
 const logger_1 = require("../utils/logger");
-const registry_1 = require("../utils/registry");
+const windowServer_1 = require("../hub/windowServer");
 const gitPatch_1 = require("./gitPatch");
 /** 当前加载的测试计划（模块级状态） */
 let currentPlan = null;
@@ -71,7 +71,7 @@ let currentPlan = null;
 let stepResults = new Map();
 /** 侧边栏 Webview 引用（由 Provider 设置） */
 let webviewRef = null;
-/** 当前 AI 上下文 */
+/** AI 生成的上下文（供 MCP 读取用于评分） */
 let currentAiContext = '';
 /**
  * 敏感信息脱敏：替换掉各种输出里的 Github Token
@@ -106,13 +106,17 @@ function getResultFileName() {
 /**
  * 更新测试计划的模型和Prompt标识
  */
-function updatePlanIdentifiers(modelId, promptId) {
+function updatePlanIdentifiers(repoId, branch, modelId, promptId) {
     if (!currentPlan) {
-        currentPlan = { steps: [], check_items: [], model_id: modelId, prompt_id: promptId };
+        currentPlan = { steps: [], check_items: [], repo_id: repoId, model_id: modelId, prompt_id: promptId };
     }
     else {
-        currentPlan.model_id = modelId;
-        currentPlan.prompt_id = promptId;
+        if (repoId !== undefined)
+            currentPlan.repo_id = repoId;
+        if (modelId !== undefined)
+            currentPlan.model_id = modelId;
+        if (promptId !== undefined)
+            currentPlan.prompt_id = promptId;
     }
     // Check current overall status based on stepResults
     let status = 'IDLE';
@@ -132,7 +136,7 @@ function updatePlanIdentifiers(modelId, promptId) {
             status = 'RUNNING';
         }
     }
-    (0, registry_1.updateInstanceStatus)(status, modelId, promptId);
+    (0, windowServer_1.pushSessionUpdate)({ status, model_id: modelId, prompt_id: promptId });
     // Automatically snapshot history if completed
     if (status === 'COMPLETED') {
         saveHistorySnapshot();
@@ -198,9 +202,15 @@ async function saveHistorySnapshot() {
 // ==========================================
 // 暴露的方法供 Webview 侧调用或刷新
 // ==========================================
+/**
+ * 获取 AI Context（供 MCP 调用）
+ */
 function getAiContext() {
     return currentAiContext;
 }
+/**
+ * 设置 AI Context（供前端面板调用）
+ */
 function setAiContext(text) {
     currentAiContext = text;
 }
@@ -214,9 +224,7 @@ function syncPlanToWebview() {
     webviewRef.postMessage({
         command: 'loadSteps',
         steps: currentPlan?.steps || [],
-        checkItems: currentPlan?.check_items || [],
-        isMcpRunning: isMcpServerRunning(),
-        aiContext: currentAiContext
+        checkItems: currentPlan?.check_items || []
     });
 }
 /**
@@ -391,8 +399,7 @@ function buildTestResult(results, totalSteps) {
         failed_steps: failedSteps,
         skipped_steps: skippedSteps,
         steps: results,
-        check_items: currentPlan?.check_items,
-        ai_context: currentAiContext || undefined,
+        check_items: currentPlan?.check_items
     };
 }
 /**
@@ -483,7 +490,7 @@ async function runAllSteps(outputDir) {
         result: testResult,
     });
     // Update registry status to COMPLETED
-    (0, registry_1.updateInstanceStatus)('COMPLETED', currentPlan.model_id, currentPlan.prompt_id);
+    (0, windowServer_1.pushSessionUpdate)({ status: 'COMPLETED', model_id: currentPlan.model_id, prompt_id: currentPlan.prompt_id });
     saveHistorySnapshot();
     const icon = testResult.final_status === 'PASS' ? '✅' : testResult.final_status === 'PARTIAL' ? '⚠️' : '❌';
     vscode.window.showInformationMessage(`${icon} 测试完成: ${testResult.passed_steps}/${testResult.total_steps} 通过 → ${outputPath}`);
@@ -575,7 +582,7 @@ async function resetStepResults() {
     // 清空结果
     stepResults.clear();
     // Update registry status to RUNNING
-    (0, registry_1.updateInstanceStatus)('RUNNING', currentPlan.model_id, currentPlan.prompt_id);
+    (0, windowServer_1.pushSessionUpdate)({ status: 'RUNNING', model_id: currentPlan.model_id, prompt_id: currentPlan.prompt_id });
     // 生成 PENDING 状态的新 test_result.json
     const config = vscode.workspace.getConfiguration('traeHarvester');
     const outputPath = config.get('resultsOutputPath', '/gitdiff_shared');

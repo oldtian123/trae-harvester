@@ -41,9 +41,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TestPanelProvider = void 0;
 const vscode = __importStar(require("vscode"));
 const testRunner_1 = require("../commands/testRunner");
+const windowServer_1 = require("../hub/windowServer");
 class TestPanelProvider {
-    constructor(_extensionUri) {
+    constructor(_extensionUri, context) {
         this._extensionUri = _extensionUri;
+        this._extensionContext = context;
     }
     /**
      * VS Code 调用此方法来初始化 Webview 视图。
@@ -122,35 +124,45 @@ class TestPanelProvider {
                     await copyPlanToJson();
                     break;
                 case 'toggleMcp':
-                    const { isMcpServerRunning, startMcpServer, stopMcpServer } = require('../mcp/mcpServer');
-                    if (isMcpServerRunning()) {
-                        stopMcpServer();
+                    // 控制窗口侧 HTTP server
+                    if ((0, windowServer_1.isWindowServerRunning)()) {
+                        (0, windowServer_1.stopWindowServer)();
+                        vscode.window.showInformationMessage('🔴 MCP Server 已停止');
                     }
                     else {
-                        startMcpServer();
+                        const port = await (0, windowServer_1.startWindowServer)(this._extensionContext);
+                        if (port) {
+                            vscode.window.showInformationMessage(`🟢 MCP Server 已启动 (端口: ${port})`);
+                        }
+                        else {
+                            vscode.window.showErrorMessage('❌ MCP Server 启动失败');
+                        }
                     }
                     this._syncCurrentState();
                     break;
                 case 'openSettings':
                     await vscode.commands.executeCommand('workbench.action.openSettings', 'traeHarvester');
                     break;
-                case 'saveAiContext':
+                case 'saveAiContext': {
                     const { setAiContext } = require('../commands/testRunner');
                     if (message.text !== undefined) {
                         setAiContext(message.text);
-                        vscode.window.showInformationMessage('✅ AI 思考上下文已保存');
+                        vscode.window.showInformationMessage('✅ AI 上下文已保存');
                     }
                     break;
-                case 'resetResults':
+                }
+                case 'resetResults': {
                     const { resetStepResults } = require('../commands/testRunner');
                     await resetStepResults();
                     vscode.window.showInformationMessage('🔄 测试执行结果已重置');
                     break;
-                case 'clearAll':
+                }
+                case 'clearAll': {
                     const { clearAllState } = require('../commands/testRunner');
                     clearAllState();
                     vscode.window.showInformationMessage('🗑️ 已清除所有上下文和测试结果');
                     break;
+                }
                 case 'checkUpdates':
                     await vscode.commands.executeCommand('trae-harvester.checkForUpdates');
                     break;
@@ -159,7 +171,10 @@ class TestPanelProvider {
                     break;
                 case 'updateIdentifiers':
                     const { updatePlanIdentifiers } = require('../commands/testRunner');
-                    updatePlanIdentifiers(message.modelId, message.promptId);
+                    updatePlanIdentifiers(message.repoId, message.branch, message.modelId, message.promptId);
+                    break;
+                case 'gitFetch':
+                    await vscode.commands.executeCommand('trae-harvester.gitFetch');
                     break;
             }
         }, undefined, []);
@@ -171,13 +186,22 @@ class TestPanelProvider {
     /**
      * 同步当前测试计划和结果到 Webview。
      */
-    _syncCurrentState() {
+    async _syncCurrentState() {
         const plan = (0, testRunner_1.getCurrentPlan)();
-        const { isMcpServerRunning } = require('../mcp/mcpServer');
-        const isMcpRunning = isMcpServerRunning();
+        const isMcpRunning = (0, windowServer_1.isWindowServerRunning)();
         const config = vscode.workspace.getConfiguration('traeHarvester');
         const modelOptions = config.get('modelOptions') || [];
         const promptOptions = config.get('promptOptions') || [];
+        const repoOptions = config.get('repoOptions') || [];
+        // 获取当前分支
+        const { getCurrentBranch } = require('../commands/gitPatch');
+        let currentBranch = 'unknown';
+        try {
+            currentBranch = await getCurrentBranch();
+        }
+        catch (e) {
+            currentBranch = '(检测失败)';
+        }
         if (plan && this._view) {
             this._view.webview.postMessage({
                 command: 'loadSteps',
@@ -186,8 +210,11 @@ class TestPanelProvider {
                 isMcpRunning,
                 modelOptions,
                 promptOptions,
+                repoOptions,
                 modelId: plan.model_id || '',
-                promptId: plan.prompt_id || ''
+                promptId: plan.prompt_id || '',
+                repoId: plan.repo_id || '',
+                branch: currentBranch
             });
             // 同步已有的执行结果
             const results = (0, testRunner_1.getStepResults)();
@@ -207,8 +234,11 @@ class TestPanelProvider {
                 isMcpRunning,
                 modelOptions,
                 promptOptions,
+                repoOptions,
                 modelId: '',
-                promptId: ''
+                promptId: '',
+                repoId: '',
+                branch: currentBranch
             });
         }
     }
@@ -240,18 +270,34 @@ class TestPanelProvider {
             </div>
 
             <!-- Identifiers Section -->
-            <div style="display: flex; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
-                <div style="flex: 1;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
+                <div>
+                    <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">仓库编号 (Repo)</label>
+                    <select id="select-repo" class="form-select" style="width: 100%; padding: 4px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card-bg); color: var(--text-primary);"></select>
+                </div>
+                <div>
+                    <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">当前分支 (Branch)</label>
+                    <input id="input-branch" type="text" readonly style="width: 100%; padding: 4px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card-bg); color: var(--text-secondary); cursor: not-allowed;" placeholder="检测中..." />
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
+                <div>
                     <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">测试模型 (Model)</label>
                     <select id="select-model" class="form-select" style="width: 100%; padding: 4px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card-bg); color: var(--text-primary);"></select>
                 </div>
-                <div style="flex: 1;">
+                <div>
                     <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">测试提示词 (Prompt)</label>
                     <select id="select-prompt" class="form-select" style="width: 100%; padding: 4px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card-bg); color: var(--text-primary);"></select>
                 </div>
             </div>
-            
+
             <div class="actions-grid">
+                <button id="btn-git-fetch" class="btn btn-secondary" title="从远端拉取最新分支信息">
+                    <span class="icon-normal">🔄</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">Git Fetch</span>
+                </button>
                 <button id="btn-toggle-mcp" class="btn btn-secondary" title="开启或关闭 MCP Server (供大模型连接)">
                     <span class="icon-normal">🔴</span>
                     <span class="spinner"></span>
@@ -390,9 +436,9 @@ class TestPanelProvider {
         <!-- AI Context Card -->
         <div class="section-card">
             <div class="section-header">
-                <span>🧠 AI 思考上下文 (Evidence)</span>
+                <span>🧠 AI 生成上下文 (Agent Context)</span>
             </div>
-            <textarea id="input-ai-context" class="input-field" rows="4" placeholder="将 AI 生成的思考过程或代码分析粘贴在这里..." style="resize: vertical;"></textarea>
+            <textarea id="input-ai-context" class="input-field" rows="4" placeholder="将 AI Agent 生成的思考过程或代码分析粘贴在这里，供 MCP 读取用于评分..." style="resize: vertical;"></textarea>
             <div class="actions-grid full" style="margin-top: 4px;">
                 <button id="btn-save-ai-context" class="btn btn-primary">
                     <span class="icon-normal">💾</span>

@@ -40,9 +40,9 @@ const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const os = __importStar(require("os"));
 const logger_1 = require("./logger");
-const REPO_RAW_BASE = 'https://raw.githubusercontent.com/oldtian123/trae-harvester/main';
-const PACKAGE_JSON_URL = `${REPO_RAW_BASE}/package.json`;
-const VSIX_URL = `${REPO_RAW_BASE}/trae-harvester.vsix`;
+const GITHUB_REPO = 'oldtian123/trae-harvester';
+const GITHUB_API_BASE = 'https://api.github.com';
+const LATEST_RELEASE_URL = `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/releases/latest`;
 /**
  * 检查并执行自动更新
  * @param context 扩展上下文
@@ -55,22 +55,30 @@ async function checkForUpdates(context, isManual = false) {
         log.info('AutoUpdater', `当前版本: ${currentVersion} (手动检查: ${isManual})`);
         const configToken = vscode.workspace.getConfiguration('traeHarvester').get('githubToken');
         const githubToken = configToken || process.env.GITHUB_TOKEN;
-        // Fetch remote package.json (带随机数绕过缓存)
-        const ts = Date.now();
-        const remotePackageJsonStr = await fetchUrl(`${PACKAGE_JSON_URL}?t=${ts}`, githubToken);
-        const remotePackageJson = JSON.parse(remotePackageJsonStr);
-        const remoteVersion = remotePackageJson.version;
-        if (!remoteVersion) {
-            if (isManual)
-                vscode.window.showErrorMessage('检查更新失败：无法解析远程版本号');
-            return;
-        }
-        log.info('AutoUpdater', `线上版本: ${remoteVersion}`);
+        // Fetch latest release from GitHub API
+        log.info('AutoUpdater', `正在检查最新版本: ${LATEST_RELEASE_URL}`);
+        const releaseData = await fetchJson(LATEST_RELEASE_URL, githubToken);
+        const remoteVersion = releaseData.tag_name.replace(/^v/, ''); // 去掉 v 前缀
+        log.info('AutoUpdater', `线上最新版本: ${remoteVersion}`);
         // 对比版本号
         if (isNewerVersion(currentVersion, remoteVersion)) {
-            const action = await vscode.window.showInformationMessage(`Trae Harvester 发现新版本 (v${remoteVersion})，当前版本 v${currentVersion}。是否立即更新？`, '立即更新', '稍后');
+            // 查找 .vsix 文件
+            const vsixAsset = releaseData.assets.find(a => a.name.endsWith('.vsix'));
+            if (!vsixAsset) {
+                if (isManual) {
+                    vscode.window.showErrorMessage('❌ 最新版本没有找到 VSIX 文件，请手动安装');
+                }
+                return;
+            }
+            const sizeInMB = (vsixAsset.size / 1024 / 1024).toFixed(2);
+            const action = await vscode.window.showInformationMessage(`🎉 Trae Harvester 发现新版本 v${remoteVersion}（当前 v${currentVersion}）\n` +
+                `文件: ${vsixAsset.name} (${sizeInMB} MB)\n` +
+                `是否立即更新？`, '立即更新', '查看更新说明', '稍后');
             if (action === '立即更新') {
-                await downloadAndInstallUpdate(remoteVersion, githubToken);
+                await downloadAndInstallUpdate(vsixAsset.browser_download_url, vsixAsset.name, githubToken);
+            }
+            else if (action === '查看更新说明') {
+                vscode.env.openExternal(vscode.Uri.parse(releaseData.html_url));
             }
         }
         else {
@@ -83,32 +91,38 @@ async function checkForUpdates(context, isManual = false) {
     catch (e) {
         log.error('AutoUpdater', '检查更新失败', e);
         if (isManual) {
-            vscode.window.showErrorMessage(`❌ 检查更新失败: ${e.message}`);
+            vscode.window.showErrorMessage(`❌ 检查更新失败: ${e.message}\n请检查网络连接或 GitHub Token 配置`);
         }
     }
 }
-function fetchUrl(url, token) {
+function fetchJson(url, token) {
     return new Promise((resolve, reject) => {
-        const options = {};
+        const options = {
+            headers: {
+                'User-Agent': 'Trae-Harvester-Updater',
+            }
+        };
         if (token) {
-            options.headers = { 'Authorization': `token ${token}` };
+            options.headers['Authorization'] = `Bearer ${token}`;
         }
         https.get(url, options, (res) => {
-            // 处理重定向 (GitHub Raw 可能会有 301/302)
+            // 处理重定向
             if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                let redirectUrl = res.headers.location;
-                if (!redirectUrl.startsWith('http')) {
-                    const parsedUrl = new URL(url);
-                    redirectUrl = `${parsedUrl.protocol}//${parsedUrl.host}${redirectUrl}`;
-                }
-                return fetchUrl(redirectUrl, token).then(resolve).catch(reject);
+                return fetchJson(res.headers.location, token).then(resolve).catch(reject);
             }
             if (res.statusCode !== 200) {
-                return reject(new Error(`Failed to fetch ${url}, status code: ${res.statusCode}`));
+                return reject(new Error(`GitHub API 返回 ${res.statusCode}: ${res.statusMessage}`));
             }
             let data = '';
             res.on('data', chunk => data += chunk);
-            res.on('end', () => resolve(data));
+            res.on('end', () => {
+                try {
+                    resolve(JSON.parse(data));
+                }
+                catch (e) {
+                    reject(new Error('解析 JSON 失败'));
+                }
+            });
         }).on('error', reject);
     });
 }
@@ -116,7 +130,6 @@ function fetchUrl(url, token) {
  * 判断 remote 是否比 local 更新
  */
 function isNewerVersion(local, remote) {
-    // 简单处理带有 "-beta" 等后缀的情况，只对比前面的数字
     const getVersionDigits = (v) => v.split('-')[0].split('.').map(s => parseInt(s, 10) || 0);
     const lParts = getVersionDigits(local);
     const rParts = getVersionDigits(remote);
@@ -133,25 +146,23 @@ function isNewerVersion(local, remote) {
 /**
  * 下载并调用 VS Code API 安装
  */
-async function downloadAndInstallUpdate(version, token) {
+async function downloadAndInstallUpdate(downloadUrl, filename, token) {
     const log = (0, logger_1.getLogger)();
     await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: `正在下载 Trae Harvester v${version}...`,
+        title: `正在下载 ${filename}...`,
         cancellable: false
     }, async (progress) => {
         try {
-            const ts = Date.now();
-            const tmpPath = path.join(os.tmpdir(), `trae-harvester-v${version}-${ts}.vsix`);
-            const downloadUrl = `${VSIX_URL}?t=${ts}`; // 绕过缓存
+            const tmpPath = path.join(os.tmpdir(), `trae-harvester-update-${Date.now()}.vsix`);
             log.info('AutoUpdater', `下载地址: ${downloadUrl}`);
             log.info('AutoUpdater', `保存到: ${tmpPath}`);
             await downloadFile(downloadUrl, tmpPath, progress, token);
             progress.report({ message: '下载完成，正在安装扩展...' });
             // 使用 VS Code 原生 API 安装 VSIX
             await vscode.commands.executeCommand('workbench.extensions.installExtension', vscode.Uri.file(tmpPath));
-            log.setSuccess(`扩展更新到 v${version} 成功`);
-            // 安装完成后清理临时文件
+            log.setSuccess(`扩展更新成功: ${filename}`);
+            // 清理临时文件
             try {
                 if (fs.existsSync(tmpPath)) {
                     fs.unlinkSync(tmpPath);
@@ -161,7 +172,7 @@ async function downloadAndInstallUpdate(version, token) {
             catch (cleanupErr) {
                 log.warn('AutoUpdater', `清理临时文件失败: ${cleanupErr.message}`);
             }
-            const action = await vscode.window.showInformationMessage(`🎉 Trae Harvester v${version} 更新成功！需要重载窗口以生效。`, '重载窗口');
+            const action = await vscode.window.showInformationMessage(`🎉 Trae Harvester 更新成功！需要重载窗口以生效。`, '重载窗口', '稍后');
             if (action === '重载窗口') {
                 vscode.commands.executeCommand('workbench.action.reloadWindow');
             }
@@ -176,22 +187,23 @@ function downloadFile(url, dest, progress, token) {
     return new Promise((resolve, reject) => {
         const file = fs.createWriteStream(dest);
         const doDownload = (targetUrl) => {
-            const options = {};
+            const options = {
+                headers: {
+                    'User-Agent': 'Trae-Harvester-Updater',
+                }
+            };
             if (token) {
-                options.headers = { 'Authorization': `token ${token}` };
+                options.headers['Authorization'] = `Bearer ${token}`;
             }
             https.get(targetUrl, options, (res) => {
                 // 处理重定向
                 if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                    let redirectUrl = res.headers.location;
-                    if (!redirectUrl.startsWith('http')) {
-                        const parsedUrl = new URL(targetUrl);
-                        redirectUrl = `${parsedUrl.protocol}//${parsedUrl.host}${redirectUrl}`;
-                    }
-                    return doDownload(redirectUrl);
+                    return doDownload(res.headers.location);
                 }
                 if (res.statusCode !== 200) {
-                    return reject(new Error(`Failed to download, status code: ${res.statusCode}`));
+                    file.close();
+                    fs.unlink(dest, () => { });
+                    return reject(new Error(`下载失败，HTTP ${res.statusCode}`));
                 }
                 const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
                 let downloadedBytes = 0;
@@ -212,6 +224,7 @@ function downloadFile(url, dest, progress, token) {
                     resolve();
                 });
             }).on('error', (err) => {
+                file.close();
                 fs.unlink(dest, () => { });
                 reject(err);
             });
