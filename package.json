@@ -2,8 +2,12 @@
   "name": "trae-harvester",
   "displayName": "Trae Harvester (Trae 自动化收割机)",
   "description": "一键收割代码资产、测试状态和 AI 思考上下文，输出结构化 JSON 供下游 AI 打分评估",
-  "version": "0.5.0-beta",
+  "version": "0.5.3",
   "publisher": "trae-harvester",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oldtian123/trae-harvester.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },

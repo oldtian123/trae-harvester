@@ -104,6 +104,27 @@ export function createHubMcpServer(deps: HubToolDeps): McpServer {
     );
 
     server.tool(
+        'trea_harvester_collect_all',
+        'Advanced aggregation tool: automatically execute and collect all evaluation materials based on options. Supports ensure_patch, ensure_tests, run_tests_if_missing, include_ai_context, include_logs.',
+        {
+            ...sessionArg,
+            ensure_patch: z.boolean().optional().describe('Automatically export git patch if not present (default: true)'),
+            ensure_tests: z.boolean().optional().describe('Include test results (default: true)'),
+            run_tests_if_missing: z.boolean().optional().describe('Automatically run tests if results are missing (default: false, requires mcpAllowExecution)'),
+            include_ai_context: z.boolean().optional().describe('Include AI-generated context (default: true)'),
+            include_logs: z.boolean().optional().describe('Include plugin runtime logs (default: false)'),
+        },
+        async ({ session_id, ensure_patch, ensure_tests, run_tests_if_missing, include_ai_context, include_logs }) =>
+            forward(session_id, WINDOW_TOOLS.COLLECT_ALL, {
+                ensure_patch,
+                ensure_tests,
+                run_tests_if_missing,
+                include_ai_context,
+                include_logs,
+            })
+    );
+
+    server.tool(
         'trea_harvester_export_patch',
         'Export a fresh git patch (current branch vs main) in the target window and return the patch file path.',
         sessionArg,

@@ -73,6 +73,20 @@ function createHubMcpServer(deps) {
         return deps.callWindow(r.sessionId, tool, args).catch((e) => textResult(`Failed to reach window: ${e?.message || e}`, true));
     };
     server.tool('trea_harvester_get_evidence', 'Gather the complete evaluation evidence (git patch + test results + manual check items + AI context) from a target window, returning one JSON object for scoring.', sessionArg, async ({ session_id }) => forward(session_id, protocol_1.WINDOW_TOOLS.GET_EVIDENCE));
+    server.tool('trea_harvester_collect_all', 'Advanced aggregation tool: automatically execute and collect all evaluation materials based on options. Supports ensure_patch, ensure_tests, run_tests_if_missing, include_ai_context, include_logs.', {
+        ...sessionArg,
+        ensure_patch: zod_1.z.boolean().optional().describe('Automatically export git patch if not present (default: true)'),
+        ensure_tests: zod_1.z.boolean().optional().describe('Include test results (default: true)'),
+        run_tests_if_missing: zod_1.z.boolean().optional().describe('Automatically run tests if results are missing (default: false, requires mcpAllowExecution)'),
+        include_ai_context: zod_1.z.boolean().optional().describe('Include AI-generated context (default: true)'),
+        include_logs: zod_1.z.boolean().optional().describe('Include plugin runtime logs (default: false)'),
+    }, async ({ session_id, ensure_patch, ensure_tests, run_tests_if_missing, include_ai_context, include_logs }) => forward(session_id, protocol_1.WINDOW_TOOLS.COLLECT_ALL, {
+        ensure_patch,
+        ensure_tests,
+        run_tests_if_missing,
+        include_ai_context,
+        include_logs,
+    }));
     server.tool('trea_harvester_export_patch', 'Export a fresh git patch (current branch vs main) in the target window and return the patch file path.', sessionArg, async ({ session_id }) => forward(session_id, protocol_1.WINDOW_TOOLS.EXPORT_PATCH));
     server.tool('trea_harvester_get_git_patch', 'Return the git patch content stored in the target window from its last export.', sessionArg, async ({ session_id }) => forward(session_id, protocol_1.WINDOW_TOOLS.GET_GIT_PATCH));
     server.tool('trea_harvester_run_all_tests', 'Execute all test steps in the target window (subject to that window\'s read-only mode).', sessionArg, async ({ session_id }) => forward(session_id, protocol_1.WINDOW_TOOLS.RUN_ALL_TESTS));

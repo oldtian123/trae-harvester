@@ -34,7 +34,7 @@ export async function dispatchToolCall(tool: WindowToolName, args: Record<string
     try {
         switch (tool) {
             case WINDOW_TOOLS.GET_EVIDENCE: {
-                // 组装完整证据：导出 patch + 获取测试结果 + AI 上下文
+                // 组装完整证据：导出 patch + 获取测试结果 + AI 上下文 + 会话元信息
                 const outputDir = config.get<string>('patchOutputPath', '/gitdiff_shared');
                 let patchContent = '';
                 try {
@@ -43,14 +43,116 @@ export async function dispatchToolCall(tool: WindowToolName, args: Record<string
                 } catch (e: any) {
                     patchContent = `Failed to get patch: ${e.message}`;
                 }
+
+                // 显式获取 AI Context
+                const aiContext = getAiContext();
                 const testResults = getTestResultsForEvidence();
+                const currentPlan = getCurrentPlan();
+
+                // 获取当前分支
+                const { getCurrentBranch } = require('../commands/gitPatch');
+                let currentBranch = 'unknown';
+                try {
+                    currentBranch = await getCurrentBranch();
+                } catch (e) {
+                    currentBranch = 'unknown';
+                }
+
+                // 组装完整 evidence（包含会话元信息）
                 const evidenceData = {
-                    ai_context: testResults?.ai_context || '',
+                    session_id: args.session_id || 'unknown',
+                    workspace: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'unknown',
+                    repo_id: currentPlan?.repo_id || 'unknown',
+                    branch: currentBranch,
+                    model_id: currentPlan?.model_id || 'unknown',
+                    prompt_id: currentPlan?.prompt_id || 'unknown',
+                    ai_context: aiContext || testResults?.ai_context || '',
                     git_patch: patchContent,
+                    test_plan: currentPlan || null,
                     test_results: testResults?.steps || [],
                     manual_check_items: testResults?.check_items || [],
                 };
                 return textResult(JSON.stringify(evidenceData, null, 2));
+            }
+
+            case WINDOW_TOOLS.COLLECT_ALL: {
+                // 聚合采集工具：根据选项自动执行并收集所有评分材料
+                const options = {
+                    ensure_patch: args.ensure_patch !== false,
+                    ensure_tests: args.ensure_tests !== false,
+                    run_tests_if_missing: args.run_tests_if_missing === true,
+                    include_ai_context: args.include_ai_context !== false,
+                    include_logs: args.include_logs === true,
+                };
+
+                const outputDir = config.get<string>('patchOutputPath', '/gitdiff_shared');
+                const result: any = {
+                    session_id: args.session_id || 'unknown',
+                    workspace: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'unknown',
+                };
+
+                // 1. 获取测试计划和元信息
+                const currentPlan = getCurrentPlan();
+                result.repo_id = currentPlan?.repo_id || 'unknown';
+                result.model_id = currentPlan?.model_id || 'unknown';
+                result.prompt_id = currentPlan?.prompt_id || 'unknown';
+                result.test_plan = currentPlan || null;
+
+                // 2. 获取分支
+                const { getCurrentBranch } = require('../commands/gitPatch');
+                try {
+                    result.branch = await getCurrentBranch();
+                } catch (e) {
+                    result.branch = 'unknown';
+                }
+
+                // 3. 确保测试计划存在
+                if (options.ensure_tests && !currentPlan) {
+                    result.warnings = result.warnings || [];
+                    result.warnings.push('No test plan loaded. Use trae_harvester_import_test_plan to import one.');
+                }
+
+                // 4. 运行测试（如果需要且允许）
+                if (options.run_tests_if_missing && currentPlan && allowExecution) {
+                    const resultsMap = getStepResults();
+                    const hasPendingSteps = currentPlan.steps.some(s => !resultsMap.get(s.step_number));
+
+                    if (hasPendingSteps) {
+                        getLogger().info('ToolHandlers', 'Running tests as requested by collect_all...');
+                        vscode.commands.executeCommand('trae-harvester.runAllTests');
+                        result.info = result.info || [];
+                        result.info.push('Started running tests. Use trae_harvester_get_test_results to poll results.');
+                    }
+                }
+
+                // 5. 获取测试结果
+                if (options.ensure_tests) {
+                    const testResults = getTestResultsForEvidence();
+                    result.test_results = testResults?.steps || [];
+                    result.manual_check_items = testResults?.check_items || [];
+                }
+
+                // 6. 确保 Patch
+                if (options.ensure_patch) {
+                    try {
+                        await exportGitPatch(outputDir);
+                        result.git_patch = getStoredGitPatchContent();
+                    } catch (e: any) {
+                        result.git_patch = `Failed to export patch: ${e.message}`;
+                    }
+                }
+
+                // 7. 包含 AI Context
+                if (options.include_ai_context) {
+                    result.ai_context = getAiContext() || '';
+                }
+
+                // 8. 包含日志（可选）
+                if (options.include_logs) {
+                    result.logs = 'Log export not implemented. Use trae_harvester_get_logs instead.';
+                }
+
+                return textResult(JSON.stringify(result, null, 2));
             }
 
             case WINDOW_TOOLS.EXPORT_PATCH: {

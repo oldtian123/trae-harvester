@@ -82,6 +82,18 @@ async function gitFetch() {
         await (0, shell_1.execCommand)('git fetch --all', { cwd, timeout: 30000 });
         vscode.window.showInformationMessage('✅ Git Fetch 完成');
         log.info('GitFetch', 'Git fetch completed successfully');
+        // 自动更新分支信息到 Hub
+        try {
+            const { pushSessionUpdate } = require('../hub/windowServer');
+            const currentBranch = await getCurrentBranch();
+            if (currentBranch && currentBranch !== 'unknown') {
+                pushSessionUpdate({ branch: currentBranch });
+                log.info('GitFetch', `Updated branch to Hub: ${currentBranch}`);
+            }
+        }
+        catch (e) {
+            log.warn('GitFetch', `Could not update branch to Hub: ${e.message}`);
+        }
     }
     catch (err) {
         log.error('GitFetch', 'Git fetch failed', err);

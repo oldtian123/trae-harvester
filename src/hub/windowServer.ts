@@ -116,6 +116,12 @@ export async function startWindowServer(context: vscode.ExtensionContext): Promi
                 server = s;
                 myPort = port;
                 log(`✅ Window server started on ${host}:${port}`);
+
+                // 自动更新 repo/branch 信息
+                autoUpdateRepoAndBranch().catch(err => {
+                    log(`Failed to auto-update repo/branch: ${err.message}`);
+                });
+
                 resolve(port);
             });
 
@@ -161,6 +167,23 @@ export function isWindowServerRunning(): boolean {
  */
 export function getWindowServerPort(): number | null {
     return myPort;
+}
+
+/**
+ * 自动更新 repo 和 branch 信息到 Hub
+ */
+async function autoUpdateRepoAndBranch(): Promise<void> {
+    try {
+        const { getCurrentBranch } = require('../commands/gitPatch');
+        const branch = await getCurrentBranch();
+
+        if (branch && branch !== 'unknown') {
+            currentIdentifiers.branch = branch;
+            log(`Auto-updated branch: ${branch}`);
+        }
+    } catch (e: any) {
+        log(`Could not detect branch: ${e.message}`);
+    }
 }
 
 /**

@@ -150,6 +150,10 @@ async function startWindowServer(context) {
                 server = s;
                 myPort = port;
                 log(`✅ Window server started on ${host}:${port}`);
+                // 自动更新 repo/branch 信息
+                autoUpdateRepoAndBranch().catch(err => {
+                    log(`Failed to auto-update repo/branch: ${err.message}`);
+                });
                 resolve(port);
             });
             s.on('error', (err) => {
@@ -191,6 +195,22 @@ function isWindowServerRunning() {
  */
 function getWindowServerPort() {
     return myPort;
+}
+/**
+ * 自动更新 repo 和 branch 信息到 Hub
+ */
+async function autoUpdateRepoAndBranch() {
+    try {
+        const { getCurrentBranch } = require('../commands/gitPatch');
+        const branch = await getCurrentBranch();
+        if (branch && branch !== 'unknown') {
+            currentIdentifiers.branch = branch;
+            log(`Auto-updated branch: ${branch}`);
+        }
+    }
+    catch (e) {
+        log(`Could not detect branch: ${e.message}`);
+    }
 }
 /**
  * 推送会话更新（本地调用，不经过网络）。

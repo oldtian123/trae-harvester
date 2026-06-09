@@ -88,6 +88,7 @@ export interface ToolResult {
 /** 窗口侧可被 Hub 反向调用的工具名（去掉 session_id 维度后的本地动作） */
 export const WINDOW_TOOLS = {
     GET_EVIDENCE: 'get_evidence',
+    COLLECT_ALL: 'collect_all',
     EXPORT_PATCH: 'export_patch',
     GET_GIT_PATCH: 'get_git_patch',
     RUN_ALL_TESTS: 'run_all_tests',
