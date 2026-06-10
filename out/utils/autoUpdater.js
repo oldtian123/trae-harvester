@@ -42,7 +42,7 @@ const os = __importStar(require("os"));
 const logger_1 = require("./logger");
 const GITHUB_REPO = 'oldtian123/trae-harvester';
 const GITHUB_API_BASE = 'https://api.github.com';
-const LATEST_RELEASE_URL = `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/releases/latest`;
+const RELEASES_URL = `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/releases`;
 /**
  * 检查并执行自动更新
  * @param context 扩展上下文
@@ -55,9 +55,17 @@ async function checkForUpdates(context, isManual = false) {
         log.info('AutoUpdater', `当前版本: ${currentVersion} (手动检查: ${isManual})`);
         const configToken = vscode.workspace.getConfiguration('traeHarvester').get('githubToken');
         const githubToken = configToken || process.env.GITHUB_TOKEN;
-        // Fetch latest release from GitHub API
-        log.info('AutoUpdater', `正在检查最新版本: ${LATEST_RELEASE_URL}`);
-        const releaseData = await fetchJson(LATEST_RELEASE_URL, githubToken);
+        // Fetch releases from GitHub API
+        log.info('AutoUpdater', `正在检查最新版本: ${RELEASES_URL}`);
+        const releases = await fetchJson(RELEASES_URL, githubToken);
+        if (!Array.isArray(releases) || releases.length === 0) {
+            throw new Error('没有找到任何发布版本');
+        }
+        // 获取最新的非草稿发布版（支持预发布版 prerelease）
+        const releaseData = releases.find(r => !r.draft);
+        if (!releaseData) {
+            throw new Error('没有找到任何可用的发布版本');
+        }
         const remoteVersion = releaseData.tag_name.replace(/^v/, ''); // 去掉 v 前缀
         log.info('AutoUpdater', `线上最新版本: ${remoteVersion}`);
         // 对比版本号
