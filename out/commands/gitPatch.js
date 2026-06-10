@@ -48,6 +48,7 @@ const path = __importStar(require("path"));
 const shell_1 = require("../utils/shell");
 const fileUtils_1 = require("../utils/fileUtils");
 const logger_1 = require("../utils/logger");
+const pathResolver_1 = require("../utils/pathResolver");
 let currentGitPatchContent = '';
 function getStoredGitPatchContent() {
     return currentGitPatchContent;
@@ -312,8 +313,7 @@ async function exportGitPatch(outputDir) {
 function registerExportPatchCommand(context) {
     return vscode.commands.registerCommand('trae-harvester.exportPatch', async () => {
         try {
-            const config = vscode.workspace.getConfiguration('traeHarvester');
-            const outputPath = config.get('patchOutputPath', '/gitdiff_shared');
+            const outputPath = (0, pathResolver_1.resolveOutputPath)('patch');
             await exportGitPatch(outputPath);
         }
         catch (err) {

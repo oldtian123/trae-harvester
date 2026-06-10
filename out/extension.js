@@ -48,6 +48,7 @@ const logger_1 = require("./utils/logger");
 const windowServer_1 = require("./hub/windowServer");
 const autoUpdater_1 = require("./utils/autoUpdater");
 const path = __importStar(require("path"));
+const pathResolver_1 = require("./utils/pathResolver");
 /**
  * 扩展激活时调用。
  * VS Code 会在用户首次触发本扩展注册的命令或视图时调用此函数。
@@ -115,9 +116,9 @@ function activate(context) {
                 // AI Context feature has been removed.
                 progress.report({ message: '完成!', increment: 100 });
             });
-            const config = vscode.workspace.getConfiguration('traeHarvester');
-            const outputPath = config.get('patchOutputPath', '/gitdiff_shared');
-            vscode.window.showInformationMessage(`🎉 收割完成! 产物目录: ${outputPath}`);
+            const patchPath = (0, pathResolver_1.resolveOutputPath)('patch');
+            const resultsPath = (0, pathResolver_1.resolveOutputPath)('results');
+            vscode.window.showInformationMessage(`🎉 收割完成! Patch目录: ${patchPath} | 结果目录: ${resultsPath}`);
         }
         catch (err) {
             vscode.window.showErrorMessage(`❌ 收割失败: ${err.message}`);

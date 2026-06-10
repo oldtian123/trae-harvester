@@ -2,7 +2,7 @@
   "name": "trae-harvester",
   "displayName": "Trae Harvester (Trae 自动化收割机)",
   "description": "一键收割代码资产、测试状态和 AI 思考上下文，输出结构化 JSON 供下游 AI 打分评估",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "publisher": "trae-harvester",
   "repository": {
     "type": "git",
@@ -102,6 +102,11 @@
           "type": "string",
           "default": "/gitdiff_shared",
           "description": "测试结果 JSON 产物的绝对导出路径 (Absolute path for JSON Results output)"
+        },
+        "traeHarvester.autoDetectWorkspaceStructure": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否自动识别末尾为 /app 的工作区结构，并将其 sibling 同级的 /gitdiff 和 /result 文件夹作为产物导出路径 (Auto-detect workspace ending in /app and use sibling /gitdiff and /result)"
         },
         "traeHarvester.commandTimeout": {
           "type": "number",

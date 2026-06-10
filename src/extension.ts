@@ -12,6 +12,7 @@ import { getLogger } from './utils/logger';
 import { stopWindowServer } from './hub/windowServer';
 import { checkForUpdates } from './utils/autoUpdater';
 import * as path from 'path';
+import { resolveOutputPath } from './utils/pathResolver';
 
 /**
  * 扩展激活时调用。
@@ -99,10 +100,10 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                 );
 
-                const config = vscode.workspace.getConfiguration('traeHarvester');
-                const outputPath = config.get<string>('patchOutputPath', '/gitdiff_shared');
+                const patchPath = resolveOutputPath('patch');
+                const resultsPath = resolveOutputPath('results');
                 vscode.window.showInformationMessage(
-                    `🎉 收割完成! 产物目录: ${outputPath}`
+                    `🎉 收割完成! Patch目录: ${patchPath} | 结果目录: ${resultsPath}`
                 );
             } catch (err: any) {
                 vscode.window.showErrorMessage(`❌ 收割失败: ${err.message}`);

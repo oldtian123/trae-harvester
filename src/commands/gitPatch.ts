@@ -9,6 +9,7 @@ import * as path from 'path';
 import { execCommand } from '../utils/shell';
 import { atomicWrite, ensureDir } from '../utils/fileUtils';
 import { getLogger } from '../utils/logger';
+import { resolveOutputPath } from '../utils/pathResolver';
 
 let currentGitPatchContent: string = '';
 
@@ -316,8 +317,7 @@ export async function exportGitPatch(outputDir: string): Promise<string> {
 export function registerExportPatchCommand(context: vscode.ExtensionContext): vscode.Disposable {
     return vscode.commands.registerCommand('trae-harvester.exportPatch', async () => {
         try {
-            const config = vscode.workspace.getConfiguration('traeHarvester');
-            const outputPath = config.get<string>('patchOutputPath', '/gitdiff_shared');
+            const outputPath = resolveOutputPath('patch');
 
             await exportGitPatch(outputPath);
         } catch (err: any) {

@@ -18,6 +18,7 @@ import {
     getStepResults
 } from '../commands/testRunner';
 import { getLogger } from '../utils/logger';
+import { resolveOutputPath } from '../utils/pathResolver';
 
 function textResult(text: string, isError = false): ToolResult {
     return { content: [{ type: 'text', text }], isError };
@@ -35,7 +36,7 @@ export async function dispatchToolCall(tool: WindowToolName, args: Record<string
         switch (tool) {
             case WINDOW_TOOLS.GET_EVIDENCE: {
                 // 组装完整证据：导出 patch + 获取测试结果 + AI 上下文 + 会话元信息
-                const outputDir = config.get<string>('patchOutputPath', '/gitdiff_shared');
+                const outputDir = resolveOutputPath('patch');
                 let patchContent = '';
                 try {
                     await exportGitPatch(outputDir);
@@ -85,7 +86,7 @@ export async function dispatchToolCall(tool: WindowToolName, args: Record<string
                     include_logs: args.include_logs === true,
                 };
 
-                const outputDir = config.get<string>('patchOutputPath', '/gitdiff_shared');
+                const outputDir = resolveOutputPath('patch');
                 const result: any = {
                     session_id: args.session_id || 'unknown',
                     workspace: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'unknown',
@@ -156,7 +157,7 @@ export async function dispatchToolCall(tool: WindowToolName, args: Record<string
             }
 
             case WINDOW_TOOLS.EXPORT_PATCH: {
-                const outputDir = config.get<string>('patchOutputPath', '/gitdiff_shared');
+                const outputDir = resolveOutputPath('patch');
                 const patchFilePath = await exportGitPatch(outputDir);
                 return textResult(`Patch exported successfully to: ${patchFilePath}`);
             }

@@ -103,7 +103,7 @@ export async function startWindowServer(context: vscode.ExtensionContext): Promi
 
     return new Promise((resolve) => {
         const tryPort = (port: number, retries: number = 0) => {
-            if (retries > 5) {
+            if (retries > 50) {
                 log(`Failed to bind after ${retries} retries`);
                 vscode.window.showErrorMessage('❌ MCP Server 启动失败：端口冲突');
                 resolve(null);
@@ -148,7 +148,14 @@ export async function startWindowServer(context: vscode.ExtensionContext): Promi
  */
 export function stopWindowServer(): void {
     if (server) {
-        server.close();
+        try {
+            if (typeof server.closeAllConnections === 'function') {
+                server.closeAllConnections();
+            }
+            server.close();
+        } catch (err: any) {
+            log(`Error closing server: ${err.message}`);
+        }
         server = null;
         myPort = null;
         log('Window server stopped');

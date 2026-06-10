@@ -139,7 +139,7 @@ async function startWindowServer(context) {
     log(`PID: ${process.pid}, calculated port: ${pidBasedPort} (remote: ${isRemote})`);
     return new Promise((resolve) => {
         const tryPort = (port, retries = 0) => {
-            if (retries > 5) {
+            if (retries > 50) {
                 log(`Failed to bind after ${retries} retries`);
                 vscode.window.showErrorMessage('❌ MCP Server 启动失败：端口冲突');
                 resolve(null);
@@ -178,7 +178,15 @@ async function startWindowServer(context) {
  */
 function stopWindowServer() {
     if (server) {
-        server.close();
+        try {
+            if (typeof server.closeAllConnections === 'function') {
+                server.closeAllConnections();
+            }
+            server.close();
+        }
+        catch (err) {
+            log(`Error closing server: ${err.message}`);
+        }
         server = null;
         myPort = null;
         log('Window server stopped');

@@ -47,6 +47,7 @@ const protocol_1 = require("./protocol");
 const gitPatch_1 = require("../commands/gitPatch");
 const testRunner_1 = require("../commands/testRunner");
 const logger_1 = require("../utils/logger");
+const pathResolver_1 = require("../utils/pathResolver");
 function textResult(text, isError = false) {
     return { content: [{ type: 'text', text }], isError };
 }
@@ -61,7 +62,7 @@ async function dispatchToolCall(tool, args) {
         switch (tool) {
             case protocol_1.WINDOW_TOOLS.GET_EVIDENCE: {
                 // 组装完整证据：导出 patch + 获取测试结果 + AI 上下文 + 会话元信息
-                const outputDir = config.get('patchOutputPath', '/gitdiff_shared');
+                const outputDir = (0, pathResolver_1.resolveOutputPath)('patch');
                 let patchContent = '';
                 try {
                     await (0, gitPatch_1.exportGitPatch)(outputDir);
@@ -108,7 +109,7 @@ async function dispatchToolCall(tool, args) {
                     include_ai_context: args.include_ai_context !== false,
                     include_logs: args.include_logs === true,
                 };
-                const outputDir = config.get('patchOutputPath', '/gitdiff_shared');
+                const outputDir = (0, pathResolver_1.resolveOutputPath)('patch');
                 const result = {
                     session_id: args.session_id || 'unknown',
                     workspace: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'unknown',
@@ -170,7 +171,7 @@ async function dispatchToolCall(tool, args) {
                 return textResult(JSON.stringify(result, null, 2));
             }
             case protocol_1.WINDOW_TOOLS.EXPORT_PATCH: {
-                const outputDir = config.get('patchOutputPath', '/gitdiff_shared');
+                const outputDir = (0, pathResolver_1.resolveOutputPath)('patch');
                 const patchFilePath = await (0, gitPatch_1.exportGitPatch)(outputDir);
                 return textResult(`Patch exported successfully to: ${patchFilePath}`);
             }

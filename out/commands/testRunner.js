@@ -65,6 +65,7 @@ const fileUtils_1 = require("../utils/fileUtils");
 const logger_1 = require("../utils/logger");
 const windowServer_1 = require("../hub/windowServer");
 const gitPatch_1 = require("./gitPatch");
+const pathResolver_1 = require("../utils/pathResolver");
 /** 当前加载的测试计划（模块级状态） */
 let currentPlan = null;
 /** 当前的步骤结果（模块级状态，支持增量执行） */
@@ -537,8 +538,7 @@ async function runSingleStep(stepNumber, outputDir) {
  * 通过明确的步骤号执行（供 Webview 界面直接调用）。
  */
 async function runStepByNumber(stepNumber) {
-    const config = vscode.workspace.getConfiguration('traeHarvester');
-    const outputPath = config.get('resultsOutputPath', '/gitdiff_shared');
+    const outputPath = (0, pathResolver_1.resolveOutputPath)('results');
     await runSingleStep(stepNumber, outputPath);
 }
 /**
@@ -549,8 +549,7 @@ async function deleteStepFromPlan(stepNumber) {
         return;
     currentPlan.steps = currentPlan.steps.filter(s => s.step_number !== stepNumber);
     stepResults.delete(stepNumber);
-    const config = vscode.workspace.getConfiguration('traeHarvester');
-    const outputPath = config.get('resultsOutputPath', '/gitdiff_shared');
+    const outputPath = (0, pathResolver_1.resolveOutputPath)('results');
     if (currentPlan.steps.length === 0 && (!currentPlan.check_items || currentPlan.check_items.length === 0)) {
         currentPlan = null;
     }
@@ -584,8 +583,7 @@ async function resetStepResults() {
     // Update registry status to RUNNING
     (0, windowServer_1.pushSessionUpdate)({ status: 'RUNNING', model_id: currentPlan.model_id, prompt_id: currentPlan.prompt_id });
     // 生成 PENDING 状态的新 test_result.json
-    const config = vscode.workspace.getConfiguration('traeHarvester');
-    const outputPath = config.get('resultsOutputPath', '/gitdiff_shared');
+    const outputPath = (0, pathResolver_1.resolveOutputPath)('results');
     const allResults = currentPlan.steps.map(s => ({
         step_number: s.step_number,
         title: s.title,
@@ -736,7 +734,7 @@ function registerTestCommands(context) {
     // 命令：一键全自动执行
     const runAllCmd = vscode.commands.registerCommand('trae-harvester.runAllTests', async () => {
         try {
-            const outputPath = config.get('resultsOutputPath', '/gitdiff_shared');
+            const outputPath = (0, pathResolver_1.resolveOutputPath)('results');
             await runAllSteps(outputPath);
         }
         catch (err) {
@@ -770,7 +768,7 @@ function registerTestCommands(context) {
             if (!selected) {
                 return;
             }
-            const outputPath = config.get('resultsOutputPath', '/gitdiff_shared');
+            const outputPath = (0, pathResolver_1.resolveOutputPath)('results');
             await runSingleStep(selected.stepNumber, outputPath);
         }
         catch (err) {
@@ -796,8 +794,7 @@ function registerTestCommands(context) {
                 };
             });
             const testResult = buildTestResult(allResults, currentPlan.steps.length);
-            const config = vscode.workspace.getConfiguration('traeHarvester');
-            const defaultDir = config.get('resultsOutputPath', '/gitdiff_shared');
+            const defaultDir = (0, pathResolver_1.resolveOutputPath)('results');
             const targetPath = path.join(defaultDir, getResultFileName());
             await (0, fileUtils_1.writeJson)(targetPath, testResult);
             vscode.window.showInformationMessage(`✅ 测试结果已成功导出至: ${targetPath}`);
