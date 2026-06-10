@@ -93,20 +93,10 @@
     "configuration": {
       "title": "Trae Harvester",
       "properties": {
-        "traeHarvester.patchOutputPath": {
-          "type": "string",
-          "default": "/gitdiff_shared",
-          "description": "Git Patch 产物的绝对导出路径 (Absolute path for Patch output)"
-        },
-        "traeHarvester.resultsOutputPath": {
-          "type": "string",
-          "default": "/gitdiff_shared",
-          "description": "测试结果 JSON 产物的绝对导出路径 (Absolute path for JSON Results output)"
-        },
         "traeHarvester.autoDetectWorkspaceStructure": {
           "type": "boolean",
           "default": true,
-          "description": "是否自动识别末尾为 /app 的工作区结构，并将其 sibling 同级的 /gitdiff 和 /result 文件夹作为产物导出路径 (Auto-detect workspace ending in /app and use sibling /gitdiff and /result)"
+          "description": "是否自动识别末尾为 /app 的工作区结构，并将其 sibling 同级的 /patch 和 /result 文件夹作为产物导出路径 (Auto-detect workspace ending in /app and use sibling /patch and /result)"
         },
         "traeHarvester.commandTimeout": {
           "type": "number",

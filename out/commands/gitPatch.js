@@ -53,16 +53,23 @@ let currentGitPatchContent = '';
 function getStoredGitPatchContent() {
     return currentGitPatchContent;
 }
-/**
- * 获取当前分支名称
- */
 async function getCurrentBranch() {
     try {
         const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!cwd)
             return 'unknown';
         const result = await (0, shell_1.execCommand)('git rev-parse --abbrev-ref HEAD', { cwd });
-        return result.stdout.trim() || 'unknown';
+        const branchName = result.stdout.trim();
+        if (!branchName || branchName === 'unknown')
+            return 'unknown';
+        try {
+            const checkRemote = await (0, shell_1.execCommand)(`git rev-parse --verify origin/${branchName}`, { cwd });
+            const isRemote = checkRemote.exitCode === 0;
+            return `${branchName} (${isRemote ? '远程' : '本地'})`;
+        }
+        catch {
+            return `${branchName} (本地)`;
+        }
     }
     catch {
         return 'unknown';
@@ -135,6 +142,16 @@ async function exportGitPatch(outputDir) {
         exitCode: branchResult.exitCode,
     });
     vscode.window.showInformationMessage(`📌 当前分支: ${currentBranch}`);
+    // ---- Step 1.5: 检查是否为远程分支 ----
+    let isRemote = false;
+    try {
+        const checkRemoteResult = await (0, shell_1.execCommand)(`git rev-parse --verify origin/${currentBranch}`, execOpts);
+        isRemote = checkRemoteResult.exitCode === 0;
+    }
+    catch {
+        isRemote = false;
+    }
+    log.info('GitPatch', `分支类型: ${isRemote ? '远程分支' : '本地分支'}`);
     // ---- Step 2: 检查工作区状态 ----
     const statusResult = await (0, shell_1.execCommand)('git status --porcelain', execOpts);
     const isClean = statusResult.stdout.trim() === '';
@@ -147,7 +164,24 @@ async function exportGitPatch(outputDir) {
         stderr: statusResult.stderr,
         exitCode: statusResult.exitCode,
     });
-    if (isClean) {
+    if (!isRemote) {
+        log.info('GitPatch', '本地分支：跳过 add/commit/push，直接生成 diff');
+        vscode.window.showInformationMessage('📂 本地分支：直接生成 Patch');
+        // 添加跳过日志
+        for (const step of ['git add .', 'git commit', 'git push']) {
+            logs.push({
+                step: `跳过: ${step}`,
+                command: step,
+                success: true,
+                stdout: '',
+                stderr: '',
+                exitCode: null,
+                skipped: true,
+                skipReason: '本地分支无需推送',
+            });
+        }
+    }
+    else if (isClean) {
         vscode.window.showInformationMessage('📂 工作区干净，跳过 commit/push');
         // 添加跳过日志
         for (const step of ['git add .', 'git commit', 'git push']) {
