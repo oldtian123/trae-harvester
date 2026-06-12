@@ -66,6 +66,17 @@
     const inputBranch = document.getElementById('input-branch');
     const selectModel = document.getElementById('select-model');
     const selectPrompt = document.getElementById('select-prompt');
+    const inputContainer = document.getElementById('input-container');
+    const btnRestartContainer = document.getElementById('btn-restart-container');
+
+    // 容器显示框与模型顺序联动：模型顺序 X → 容器尾标识 m0X
+    function updateContainerDisplay() {
+        if (!inputContainer || !selectModel) return;
+        const order = parseInt(selectModel.value, 10);
+        inputContainer.value = Number.isInteger(order) && order > 0
+            ? `m${String(order).padStart(2, '0')}`
+            : '';
+    }
 
     // ---- Panel 控制 ----
     function closeAllPanels() {
@@ -299,10 +310,18 @@
         selectRepo.addEventListener('change', notifyIdentifiersChange);
     }
     if (selectModel) {
-        selectModel.addEventListener('change', notifyIdentifiersChange);
+        selectModel.addEventListener('change', () => {
+            updateContainerDisplay();
+            notifyIdentifiersChange();
+        });
     }
     if (selectPrompt) {
         selectPrompt.addEventListener('change', notifyIdentifiersChange);
+    }
+    if (btnRestartContainer) {
+        btnRestartContainer.addEventListener('click', () => {
+            simulateActionWithToast(btnRestartContainer, 'restartContainer', '正在重启容器...', 'info', 1500);
+        });
     }
 
     // ---- 消息总线 (接收后端回传) ----
@@ -333,7 +352,7 @@
                     inputBranch.value = message.branch || 'unknown';
                 }
 
-                // Render Model Options
+                // Render Model Options（模型顺序号 1..N，对应容器 m0X）
                 if (selectModel && message.modelOptions) {
                     selectModel.innerHTML = '';
                     message.modelOptions.forEach(opt => {
@@ -348,6 +367,7 @@
                         selectModel.value = message.modelOptions[0];
                         notifyIdentifiersChange();
                     }
+                    updateContainerDisplay();
                 }
                 
                 if (selectPrompt && message.promptOptions) {

@@ -159,6 +159,9 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
                     case 'gitFetch':
                         await vscode.commands.executeCommand('trae-harvester.gitFetch');
                         break;
+                    case 'restartContainer':
+                        await vscode.commands.executeCommand('trae-harvester.restartContainer');
+                        break;
                 }
             },
             undefined,
@@ -280,13 +283,26 @@ export class TestPanelProvider implements vscode.WebviewViewProvider {
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm);">
                 <div>
-                    <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">测试模型 (Model)</label>
-                    <select id="select-model" class="form-select" style="width: 100%; padding: 4px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card-bg); color: var(--text-primary);"></select>
+                    <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">模型顺序 (m0X)</label>
+                    <select id="select-model" class="form-select" title="当前评分的模型顺序号，对应容器尾部 m0X" style="width: 100%; padding: 4px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card-bg); color: var(--text-primary);"></select>
                 </div>
                 <div>
                     <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">测试提示词 (Prompt)</label>
                     <select id="select-prompt" class="form-select" style="width: 100%; padding: 4px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card-bg); color: var(--text-primary);"></select>
                 </div>
+            </div>
+
+            <!-- 执行容器（与模型顺序联动，只读展示）+ 重启 -->
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: var(--spacing-sm); margin-bottom: var(--spacing-sm); align-items: end;">
+                <div>
+                    <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">执行容器 (Container)</label>
+                    <input id="input-container" type="text" readonly title="与模型顺序联动，命令将在尾部为该标识的容器内执行" style="width: 100%; padding: 4px; border: 1px solid var(--card-border); border-radius: 4px; background: var(--card-bg); color: var(--text-secondary); cursor: not-allowed;" placeholder="m0X" />
+                </div>
+                <button id="btn-restart-container" class="btn btn-secondary" title="重启当前模型顺序对应的容器 (docker restart)">
+                    <span class="icon-normal">♻️</span>
+                    <span class="spinner"></span>
+                    <span class="btn-text">重启容器</span>
+                </button>
             </div>
 
             <div class="actions-grid">

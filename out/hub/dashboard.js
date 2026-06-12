@@ -144,13 +144,14 @@ function printDashboard(windows, hubInfo) {
         console.log();
         return;
     }
-    const colW = { sid: 10, pid: 8, repo: 12, branch: 15, model: 18, prompt: 18, status: 12, workspace: 30 };
+    const colW = { sid: 10, pid: 8, repo: 12, branch: 15, model: 8, container: 10, prompt: 14, status: 12, workspace: 28 };
     const header = [
         padRight('SESSION_ID', colW.sid),
         padRight('PID', colW.pid),
         padRight('REPO', colW.repo),
         padRight('BRANCH', colW.branch),
-        padRight('MODEL', colW.model),
+        padRight('MODEL#', colW.model),
+        padRight('CONTAINER', colW.container),
         padRight('PROMPT', colW.prompt),
         padRight('STATUS', colW.status),
         padRight('WORKSPACE', colW.workspace),
@@ -165,6 +166,7 @@ function printDashboard(windows, hubInfo) {
             padRight(truncate(w.repo_id || '-', colW.repo), colW.repo),
             padRight(truncate(w.branch || '-', colW.branch), colW.branch),
             padRight(truncate(w.model_id || '-', colW.model), colW.model),
+            padRight(modelOrderToContainer(w.model_id), colW.container),
             padRight(truncate(w.prompt_id || '-', colW.prompt), colW.prompt),
             padRight(colorize(w.status, statusColor), colW.status + 9), // 9 = ANSI 转义序列长度补偿
             padRight(truncate(path.basename(w.workspace), colW.workspace), colW.workspace),
@@ -172,6 +174,11 @@ function printDashboard(windows, hubInfo) {
         console.log(row);
     }
     console.log();
+}
+/** 模型顺序号 → 容器尾标识 m0X；非法/空时返回 '-' */
+function modelOrderToContainer(modelId) {
+    const order = parseInt(String(modelId ?? ''), 10);
+    return Number.isInteger(order) && order > 0 ? `m${String(order).padStart(2, '0')}` : '-';
 }
 async function main() {
     console.log(colorize('\n⏳ 正在连接 Hub...\n', 'yellow'));

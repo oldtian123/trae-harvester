@@ -75,6 +75,23 @@ function activate(context) {
     });
     context.subscriptions.push(gitFetchCmd);
     log.debug('Extension', '已注册命令: trae-harvester.gitFetch');
+    // ---- 重启容器命令 ----
+    const restartContainerCmd = vscode.commands.registerCommand('trae-harvester.restartContainer', async () => {
+        try {
+            const { resolveContainerName } = require('./commands/testRunner');
+            const { restartContainer } = require('./utils/dockerExec');
+            const container = await resolveContainerName();
+            await restartContainer(container);
+            vscode.window.showInformationMessage(`♻️ 容器已重启: ${container}`);
+            log.info('Docker', `容器已重启: ${container}`);
+        }
+        catch (err) {
+            log.error('Docker', '重启容器失败', err);
+            vscode.window.showErrorMessage(`❌ 重启容器失败: ${err?.message || err}`);
+        }
+    });
+    context.subscriptions.push(restartContainerCmd);
+    log.debug('Extension', '已注册命令: trae-harvester.restartContainer');
     // ---- 注册功能二：测试命令编排 ----
     const testCmds = (0, testRunner_1.registerTestCommands)(context);
     testCmds.forEach(cmd => context.subscriptions.push(cmd));

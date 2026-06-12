@@ -277,7 +277,8 @@ app.get('/', (_req, res) => {
                     <th>PID</th>
                     <th>REPO</th>
                     <th>BRANCH</th>
-                    <th>MODEL</th>
+                    <th>MODEL#</th>
+                    <th>CONTAINER</th>
                     <th>PROMPT</th>
                     <th>STATUS</th>
                     <th>WORKSPACE</th>
@@ -291,6 +292,7 @@ app.get('/', (_req, res) => {
                     <td>${w.repo_id || '-'}</td>
                     <td>${w.branch || '-'}</td>
                     <td>${w.model_id || '-'}</td>
+                    <td><code>${/^\d+$/.test(String(w.model_id || '')) ? 'm' + String(w.model_id).padStart(2, '0') : '-'}</code></td>
                     <td>${w.prompt_id || '-'}</td>
                     <td><span class="status ${w.status}">${w.status}</span></td>
                     <td title="${w.workspace}">${w.workspace.split(/[/\\]/).pop() || w.workspace}</td>

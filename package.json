@@ -2,7 +2,7 @@
   "name": "trae-harvester",
   "displayName": "Trae Harvester (Trae 自动化收割机)",
   "description": "一键收割代码资产、测试状态和 AI 思考上下文，输出结构化 JSON 供下游 AI 打分评估",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "publisher": "trae-harvester",
   "repository": {
     "type": "git",
@@ -114,12 +114,13 @@
             "type": "string"
           },
           "default": [
-            "GPT-4o",
-            "Claude-3.5-Sonnet",
-            "DeepSeek-V2",
-            "Codex"
+            "1",
+            "2",
+            "3",
+            "4",
+            "5"
           ],
-          "description": "测试面板中可选的大模型标识列表"
+          "description": "测试面板中可选的模型顺序号列表（对应容器尾部 m0X，第 1 项即 m01）"
         },
         "traeHarvester.promptOptions": {
           "type": "array",
@@ -150,6 +151,21 @@
             "Repo_5"
           ],
           "description": "测试面板中可选的仓库编号列表"
+        },
+        "traeHarvester.dockerEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否在对应的 Docker 容器内执行测试命令（开启后命令通过 docker exec 进入按模型顺序匹配的容器执行；关闭则在本地 VM 执行）"
+        },
+        "traeHarvester.dockerWorkdir": {
+          "type": "string",
+          "default": "/app",
+          "description": "容器内执行命令的工作目录（docker exec -w）"
+        },
+        "traeHarvester.dockerShell": {
+          "type": "string",
+          "default": "sh -lc",
+          "description": "容器内用于执行命令的 shell（如 'sh -lc' 或 'bash -lc'）"
         },
         "traeHarvester.mcpAllowExecution": {
           "type": "boolean",

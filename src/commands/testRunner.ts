@@ -38,20 +38,8 @@ function sanitizeText(text: string): string {
 }
 
 function getResultFileName(): string {
-    let branchName = 'test';
-    try {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (workspaceFolder) {
-            const execSync = require('child_process').execSync;
-            const branch = execSync('git branch --show-current', { cwd: workspaceFolder, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-            if (branch) {
-                branchName = branch.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-            }
-        }
-    } catch (e) {
-        // ignore
-    }
-    return `${branchName}_result.json`;
+    // 测试结果统一命名为 result.json（不再按分支名拼接）。
+    return 'result.json';
 }
 
 /**
@@ -288,15 +276,67 @@ function parseTestPlan(jsonText: string): TestPlan {
 }
 
 /**
+ * 容器执行上下文：docker 模式下由入口预解析一次后传入。
+ */
+interface DockerContext {
+    container: string;
+    workdir: string;
+    shell: string;
+}
+
+/**
+ * 根据配置与当前计划的模型标识，解析出容器执行上下文。
+ * - dockerEnabled 关闭时返回 undefined（走 VM 本地执行）
+ * - 开启时：用模型在 modelOptions 中的顺序号匹配运行中的容器，失败则抛错（硬失败）
+ *
+ * @throws docker 不可用 / 模型顺序无法确定 / 容器未找到时抛错
+ */
+/**
+ * 按当前选择的模型顺序号，在运行中的容器里定位目标容器名。
+ * 与 dockerEnabled 开关无关（重启容器等操作也需要它）。
+ * @throws 顺序号无效 / docker 不可用 / 容器未找到时抛错
+ */
+export async function resolveContainerName(): Promise<string> {
+    const modelOrder = parseInt(String(currentPlan?.model_id ?? ''), 10);
+    if (!Number.isInteger(modelOrder) || modelOrder <= 0) {
+        throw new Error(
+            `当前未选择有效的模型顺序号（当前值「${currentPlan?.model_id ?? '(空)'}」）。请在面板顶部选择模型顺序。`
+        );
+    }
+    const { listRunningContainers, matchContainerByModelOrder } = require('../utils/dockerExec');
+    const containers: string[] = await listRunningContainers();
+    return matchContainerByModelOrder(containers, modelOrder);
+}
+
+export async function resolveDockerContext(): Promise<DockerContext | undefined> {
+    const config = vscode.workspace.getConfiguration('traeHarvester');
+    if (!config.get<boolean>('dockerEnabled', false)) {
+        return undefined;
+    }
+
+    const workdir = config.get<string>('dockerWorkdir', '/app');
+    const shell = config.get<string>('dockerShell', 'sh -lc');
+
+    const container = await resolveContainerName();
+    getLogger().info('TestRunner', `Docker 模式：→ 容器 ${container}`);
+    return { container, workdir, shell };
+}
+
+/**
  * 执行单个测试步骤。
  * 使用 spawn + 异步阻塞监听，确保完整捕获输出。
+ * 若传入 dockerCtx，则在对应容器内执行（docker exec）；否则在 VM 本地执行。
  */
-async function executeStep(step: TestStep, cwd: string, timeoutMs: number): Promise<StepResult> {
+async function executeStep(step: TestStep, cwd: string, timeoutMs: number, dockerCtx?: DockerContext): Promise<StepResult> {
     const log = getLogger();
     const startTime = Date.now();
     log.subSeparator(`步骤 #${step.step_number}: ${step.title}`);
     log.detail('命令', step.command);
-    log.detail('工作目录', step.cwd || '(默认)');
+    if (dockerCtx) {
+        log.detail('执行位置', `容器 ${dockerCtx.container}:${dockerCtx.workdir}`);
+    } else {
+        log.detail('工作目录', step.cwd || '(默认)');
+    }
 
     // 通知 Webview 步骤开始
     webviewRef?.postMessage({
@@ -306,10 +346,23 @@ async function executeStep(step: TestStep, cwd: string, timeoutMs: number): Prom
 
     try {
         const path = require('path');
-        const effectiveCwd = step.cwd ? path.resolve(cwd, step.cwd) : cwd;
         const effectiveTimeout = step.timeout || timeoutMs;
 
-        const result = await runShellCommand(step.command, effectiveCwd, effectiveTimeout);
+        let result;
+        if (dockerCtx) {
+            // 容器内执行：cwd 固定为容器内 workdir（忽略 step.cwd 的 VM 相对解析）
+            const { execInContainer } = require('../utils/dockerExec');
+            result = await execInContainer(
+                dockerCtx.container,
+                step.command,
+                dockerCtx.workdir,
+                dockerCtx.shell,
+                effectiveTimeout
+            );
+        } else {
+            const effectiveCwd = step.cwd ? path.resolve(cwd, step.cwd) : cwd;
+            result = await runShellCommand(step.command, effectiveCwd, effectiveTimeout);
+        }
 
         const durationMs = Date.now() - startTime;
         const consoleOutput = sanitizeText([
@@ -424,6 +477,16 @@ async function runAllSteps(outputDir: string): Promise<void> {
     // 清空之前的结果
     stepResults.clear();
 
+    // 解析 Docker 执行上下文（关闭时为 undefined，走本地）。失败则硬失败，不在 VM 跑出假结果。
+    let dockerCtx: DockerContext | undefined;
+    try {
+        dockerCtx = await resolveDockerContext();
+    } catch (err: any) {
+        log.error('TestRunner', 'Docker 容器解析失败', err);
+        vscode.window.showErrorMessage(`❌ Docker 容器解析失败，已中止执行: ${err.message}`);
+        return;
+    }
+
     const results: StepResult[] = [];
 
     await vscode.window.withProgress(
@@ -458,7 +521,7 @@ async function runAllSteps(outputDir: string): Promise<void> {
                     increment: (100 / currentPlan!.steps.length),
                 });
 
-                const result = await executeStep(step, workspaceFolder, timeoutMs);
+                const result = await executeStep(step, workspaceFolder, timeoutMs, dockerCtx);
                 results.push(result);
                 stepResults.set(result.step_number, result);
 
@@ -536,7 +599,17 @@ async function runSingleStep(stepNumber: number, outputDir: string): Promise<voi
     const config = vscode.workspace.getConfiguration('traeHarvester');
     const timeoutMs = config.get<number>('commandTimeout', 300000);
 
-    const result = await executeStep(step, workspaceFolder, timeoutMs);
+    // 解析 Docker 执行上下文（关闭时为 undefined，走本地）。失败则硬失败。
+    let dockerCtx: DockerContext | undefined;
+    try {
+        dockerCtx = await resolveDockerContext();
+    } catch (err: any) {
+        getLogger().error('TestRunner', 'Docker 容器解析失败', err);
+        vscode.window.showErrorMessage(`❌ Docker 容器解析失败，已中止执行: ${err.message}`);
+        return;
+    }
+
+    const result = await executeStep(step, workspaceFolder, timeoutMs, dockerCtx);
     stepResults.set(result.step_number, result);
 
     const icon = result.status === 'PASS' ? '✅' : '❌';
